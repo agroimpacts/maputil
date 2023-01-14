@@ -1,0 +1,5 @@
+downloader:
+  key: c1e1934332cc4bafa0c8c61c0f14ab20
+  geom: data/ghana_november_quads_nicfi.geojson
+  dates: ['2019-11']
+  quads_path: data/quads
