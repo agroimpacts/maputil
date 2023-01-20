@@ -13,6 +13,8 @@ class PlanetDownloader():
         """
         """
         if not os.path.exists(geom_path):
+            print(f"{geom_path} does not exist. Creating the file...")
+
             ids = []
             geometries = []
             dts = []
@@ -38,11 +40,13 @@ class PlanetDownloader():
                 if aoi is not None:
                     quads_gdf = gpd.overlay(aoi, quads_gdf)
                     quads_gdf = gpd.sjoin(left_df=quads_gdf, right_df=aoi).drop(columns=['index_right'])
-                quads_gdf.to_file(geom_path, driver='GeoJSON')
-                print(f"File {geom_path} created")
+                if geom_path is not None:
+                    quads_gdf.to_file(geom_path, driver='GeoJSON')
+                    print(f"{geom_path} created")
         else:
-            quads_gdf = gpd.read_file(geom_path)
             print(f"{geom_path} exists")
+            quads_gdf = gpd.read_file(geom_path)
+            print(f"{geom_path} read")
         return quads_gdf
 
 def query_quads(PLANET_API_KEY, API_URL, date, bbox = None):
