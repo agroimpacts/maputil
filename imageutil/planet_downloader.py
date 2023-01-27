@@ -1,14 +1,32 @@
 # Import libraries
 import os
+import re
 import requests
 import urllib
+from subprocess import run
 import time
+import numpy as np
 import geopandas as gpd
+from geopandas.tools import sjoin
 from shapely.geometry import box
+import affine
+import tempfile
+import rasterio
+from rasterio.merge import merge
+from rasterio import fill
+from rasterio.plot import show
+from rasterio.io import MemoryFile
+from rasterio.warp import reproject, Resampling
+
 
 class PlanetDownloader():
-    def __init__(self) -> None:
-        pass
+    def __init__(self, quads_gdf=None, geom_path=None) -> None:
+
+        if quads_gdf:
+            self.quads_gdf = quads_gdf
+        elif geom_path:
+            quads_gdf = gpd.read_file(geom_path)
+            self.quads_gdf = quads_gdf
 
     def get_basemap_grid(self, geom_path=None,  PLANET_API_KEY=None, API_URL=None, dates=None, aoi = None, bbox = None):
         """
@@ -38,7 +56,7 @@ class PlanetDownloader():
                     names.append(f"{mosaic_name}_{quad['id']}")
 
                 # Create the catalog
-                quads_gdf = gpd.GeoDataFrame({'grid': ids, "date": dts, 'geometry': geometries, 'fname':names}, 
+                quads_gdf = gpd.GeoDataFrame({'tile': ids, "date": dts, 'geometry': geometries, 'file':names}, 
                                             crs="EPSG:4326")
                 if aoi is not None:
                     quads_gdf = gpd.overlay(aoi, quads_gdf)
@@ -61,7 +79,7 @@ class PlanetDownloader():
             if quads_gdf is not None:
                 for i, row in quads_gdf.iterrows():
                     link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = f"{quads_path}/{row['fname']}_{row['grid']}.tiff" 
+                    filename = f"{quads_path}/{row['fname']}_{row['grid']}.tif" 
                     download_tiles_helper(link, filename)
                 return
 
@@ -69,7 +87,7 @@ class PlanetDownloader():
                 quads_gdf = gpd.read_file(geom_path)
                 for i, row in quads_gdf.iterrows():
                     link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = f"{quads_path}/{row['fname']}_{row['grid']}.tiff" 
+                    filename = f"{quads_path}/{row['fname']}_{row['grid']}.tif" 
                     download_tiles_helper(link, filename)
                 return
 
@@ -89,12 +107,92 @@ class PlanetDownloader():
                 download_tiles_helper(link, filename)
             return
 
+    def retiler(self, tile_dir, quad_dir, temp_dir, tilefile_path, dates, quads_gdf=None, geom_path=None, ):
+
+        if not os.path.isdir(tile_dir):
+            os.makedirs(tile_dir)
+
+        tile_polys = gpd.read_file(tilefile_path).astype(
+            {"tile": "str", "tile_col": "int", "tile_row": "int"}
+        )
+        if quads_gdf is None:
+            if geom_path:
+                quads_gdf = gpd.read_file(geom_path)
+            else:
+                raise ValueError("Provide nicfi gdf or path to nicfi geojson")
+        if 'file' not in quads_gdf.columns:
+            try:
+                quads_gdf['file'] = quads_gdf.apply(lambda x: f"planet_medres_normalized_analytic_{x['date']}_mosaic_{x['tile']}.tif", axis=1)
+            except KeyError:
+                raise KeyError("Make sure the quads_gdf has 'tile' and date 'columns'")
+        
+        errors = []
+        for date in dates:
+            print(f"Date: {date}")
+            nicfi_tile_polys = quads_gdf[quads_gdf['date']== date]
+            tile_polys_merc = tile_polys.to_crs(nicfi_tile_polys.crs)
+
+            for i in range(len(tile_polys_merc)):
+                tile = tile_polys_merc.iloc[[int(i)]]
+                tiles_int = sjoin(tile, nicfi_tile_polys, how='left')
+                tile_id = int(float(tile['tile'].values.flatten()[0]))
+                dst_img = f"{tile_dir}/tile{tile_id}_{date}_buf179.tif"
+                dst_cog = re.sub('.tif', '_cog.tif', dst_img)
+                if os.path.exists(f"{dst_img}") and os.path.exists(f"{dst_cog}"):
+                    os.remove(dst_img)
+                    continue
+                if os.path.exists(f"{dst_cog}"):
+                    # print(f"{tile_id} skipped")
+                    continue
+
+                nicfi_tiles_int = nicfi_tile_polys[nicfi_tile_polys['file'].isin(tiles_int['file'])]
+                if len(nicfi_tiles_int['file']) > 1:
+                    image_list = [f'{quad_dir}/{file}'for file in nicfi_tiles_int['file']]
+                elif len(nicfi_tiles_int['file']) == 1: 
+                    image_list = f"{quad_dir}/{nicfi_tiles_int['file'].values[0]}"
+                else:
+                    print("empty nicfi_tiles_int['file']")
+                    print(i)
+                    errors.append((tile_id, 'empty'))
+                    continue
+                dst_cog = re.sub('.tif', '_cog.tif', dst_img)
+                poly = tile_polys[tile_polys['tile'].isin(tile['tile'])]
+                transform = dst_transform(poly)
+
+                # retile
+                print(f'Reprojecting and retiling {dst_img}')
+                try:
+                    reproject_retile_image(image_list, transform, 2358, 2358, 4, "EPSG:4326", dst_img, temp_dir, inmemory=False)
+                except Exception as e:
+                    print(repr(e))
+                    errors.append(repr(e))
+
+                # cogification
+                cmd = ['rio', 'cogeo', 'create', '-b', '1,2,3,4', dst_img, dst_cog]
+                p = run(cmd, capture_output=True)
+                msg = p.stderr.decode().split('\n')
+                print(f'...{msg[-2]}')
+
+                cmd = ['rio', 'cogeo', 'validate', dst_cog]
+                p = run(cmd, capture_output = True)
+                msg = p.stdout.decode().split('\n')
+                print(f'...{msg[0]}')
+
+                if os.path.exists(f"{dst_cog}"):
+                    if os.path.exists(f"{dst_img}"):
+                        os.remove(dst_img)
+
+        print("All processed")
+        return errors
+
+
 def download_tiles_helper(link, filename):
+    # print(f"Downloading: {link}")
     if not os.path.isfile(filename):
-        print(f"Downloading {filename}")
         urllib.request.urlretrieve(link, filename)
+        print(f"Downloaded: {filename}")
     else:
-        print(f"{filename} already exists.")
+        print(f"File already exists: {filename}")
 
 
 def list_quads(PLANET_API_KEY=None, API_URL=None, date=None, bbox = None):
@@ -121,3 +219,156 @@ def setup_session(API_KEY):
     session = requests.Session()
     session.auth = (API_KEY, "")
     return session
+
+def get_tempfile_name(temp_dir, file_name = 'mosaic.tif'):
+    """Create a temporary filename in the tmp directory
+    """
+    file_path = os.path.join(
+        temp_dir, 
+        next(tempfile._get_candidate_names()) + "_" + file_name
+    )    
+    return file_path
+
+def dst_transform(poly, res = 0.005 / 200):
+    """
+    Create transform from boundaries of tiles
+    
+    Parameters
+    ----------
+    poly : GeoDataFrame
+        Polygon containing dimensions of interest
+    res : float
+        Resolution desired for output transform
+    
+    Returns
+    -------
+    An Affine transform
+
+    """
+    bounds = poly['geometry'].bounds.values.flatten()
+    minx = bounds[0]
+    maxy = bounds[3]
+    transform = affine.Affine(res, 0, minx, 0, -res, maxy)
+    return(transform)
+
+
+def reproject_retile_image(
+    src_images, dst_transform, dst_width, dst_height, nbands, dst_crs,
+    fileout, temp_dir, dst_dtype = np.int16, inmemory = True, cleanup=True):
+    """Takes an input images or list of images and merges (if several) and 
+    reprojects and retiles it to align to the resolution and extent defined by
+    an polygon and associated transform
+    
+    
+    Parameters:
+    ----------
+    src_images : list 
+        File path or list of file paths to input image(s). A list of images
+        will be merged first.
+    dst_transform : affine
+        affine transformation object defining projection of output image
+    dst_width : int 
+        The pixel width of the output image
+    dst_height : int
+        The pixel height of the output image
+    nbands : int
+        Number of bands in input images
+    dst_crs : str
+        Code for output CRS, e.g "EPSG:4326"
+    file_out : str
+        Output file path and name for output geotiff
+    dst_dtype : type
+        Numpy data type (default is int16)
+    inmemory : bool
+        If a mosaic should be made in memory or not. Default is True. 
+        If set to False then a mosaic with the mosaic will be 
+        written to disk in a directory called ~/tmp and then removed
+        upon completion
+    cleanup : bool
+        Whether to remove temporary mosaic (if made) or not
+    
+    Returns
+    -------
+    geotiff of retiled image writen to disk 
+    """
+    
+    
+    def reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype): 
+        src_kwargs = src.meta.copy()  # get metadata
+        kwargs = src_kwargs
+        kwargs.update({
+            "width": dst_width,
+            "height": dst_height,
+            "count": nbands,
+            "crs": dst_crs,
+            "transform": dst_transform,
+        })
+        dst_canvas = np.zeros((nbands, dst_height, dst_width))
+        for i in range(1, nbands + 1):
+            dst_canvas[i-1,] = reproject(
+                source = rasterio.band(src, i),
+                destination = dst_canvas[i-1,],
+                src_transform = src.transform,
+                src_crs = src.crs,
+                dst_transform = dst_transform,
+                dst_crs = dst_crs,
+                resampling = Resampling.cubic
+            )[0]
+        with rasterio.open(fileout, "w", **kwargs) as dst:
+            dst.write(np.rint(dst_canvas).astype(dst_dtype))
+            
+    # mosaic if list
+    if type(src_images) is list:
+        print('Mosaicking {} images'.format(len(src_images)))
+        
+        images_to_mosaic = []
+        for idx, image in enumerate(src_images):
+            try:
+              src = rasterio.open(image)
+              images_to_mosaic.append(src)
+            except:
+              print(f'File not found: {image}')
+              continue
+              # raise Exception('RasterioIOError: File not found')
+
+        # perform mosaic
+        mosaic, out_trans = merge(images_to_mosaic)
+
+        out_meta = src.meta.copy()
+        out_meta.update({
+            "height": mosaic.shape[1],
+            "width": mosaic.shape[2],
+            "transform": out_trans,
+        })
+        
+        if inmemory:
+            print('Mosaicking in memory')
+            with MemoryFile() as memfile:
+                with memfile.open(**out_meta) as dst:
+                    dst.write(mosaic)
+
+                print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
+                reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype)
+        else: 
+            temp_mosaic = get_tempfile_name(temp_dir, 'mosaic.tif')
+            print('Creating temporary mosaick {}'.format(temp_mosaic))
+
+            with rasterio.open(temp_mosaic, "w", **out_meta) as dst:
+                  dst.write(mosaic)
+            
+            print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
+            with rasterio.open(temp_mosaic, "r") as src:
+                reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype) 
+            
+            if cleanup: 
+                print('Removing temporary mosaick {}'.format(fileout))
+                os.remove(temp_mosaic)
+            
+    else: 
+        print('Retiling from single image')
+        # src_image = src_ima
+        print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
+        with rasterio.open(src_images, "r") as src:
+            reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype) 
+    
+    print('Retiling and reprojecting of {} complete!'.format(fileout))
