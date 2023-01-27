@@ -17,7 +17,7 @@ def main(config_path):
     tilefile_path = config['tilefile_path']
 
     aoi = gpd.read_file(config['geom'])[['geometry']].dissolve()
-    downloader = PlanetDownloader(geom_path = geom_path)
+    downloader = PlanetDownloader()
     quads_gdf, quads_url = downloader.get_basemap_grid (
                                             geom_path = geom_path, 
                                             PLANET_API_KEY = PLANET_API_KEY, 
