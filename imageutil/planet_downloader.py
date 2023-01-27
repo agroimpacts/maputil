@@ -21,12 +21,7 @@ from rasterio.warp import reproject, Resampling
 
 class PlanetDownloader():
     def __init__(self, quads_gdf=None, geom_path=None) -> None:
-
-        if quads_gdf:
-            self.quads_gdf = quads_gdf
-        elif geom_path:
-            quads_gdf = gpd.read_file(geom_path)
-            self.quads_gdf = quads_gdf
+        pass
 
     def get_basemap_grid(self, geom_path=None,  PLANET_API_KEY=None, API_URL=None, dates=None, aoi = None, bbox = None):
         """
