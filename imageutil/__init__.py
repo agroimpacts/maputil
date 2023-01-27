@@ -1,1 +1,1 @@
-from .planet_basemap_downloader import *
+from .planet_downloader import *
