@@ -1,5 +1,11 @@
-downloader:
-  key: ***REMOVED***
-  geom: data/ghana_november_quads_nicfi.geojson
-  dates: ['2019-11']
-  quads_path: data/quads
+doDownload: False
+doRetile: True
+key: ***REMOVED***
+list_quad_url: 'https://api.planet.com/basemaps/v1/mosaics'
+geom: data/ghana_november_quads_nicfi_mini.geojson
+dates: ['2019-06_2019-11']
+bbox: [-2.87993585, 10.83330598,  0.0300383 , 11.17329979]
+quad_dir: data/quads
+tile_dir: data/tiles
+temp_dir: data/temp
+tilefile_path: data/ghana_tiles_buf179_mini.geojson
