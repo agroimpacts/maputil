@@ -230,9 +230,9 @@ class PlanetDownloader():
                 # Name output file paths
                 tile_id = int(float(tile['tile'].values.flatten()[0]))
                 tile_id_str = f"{tile_id}"
-                dst_img = re.sub('{tile_dir}', tile_dir, dst_img_pt)
-                dst_img = re.sub('{tile_id}', tile_id_str, dst_img)
-                dst_img = re.sub('{date}', date, dst_img)
+                dst_img = re.sub('<tile_dir>', tile_dir, dst_img_pt)
+                dst_img = re.sub('<tile_id>', tile_id_str, dst_img)
+                dst_img = re.sub('<date>', date, dst_img)
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
 
                 # Check if files already exist
@@ -292,9 +292,9 @@ def get_quad_download_url(url, id):
 
 
 def get_quad_path(quad_name, quad_dir, qname, id):
-    filename = re.sub('{quad_dir}', quad_dir, quad_name)
-    filename = re.sub('{qname}', qname, filename)
-    filename = re.sub('{id}', id, filename)
+    filename = re.sub('<quad_dir>', quad_dir, quad_name)
+    filename = re.sub('<qname>', qname, filename)
+    filename = re.sub('<id>', id, filename)
     return filename
 
 
