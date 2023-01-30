@@ -287,12 +287,45 @@ class PlanetDownloader():
 
 
 
-def get_quad_download_url(url, id):
-    return re.sub('<id>', id, url)
+def get_quad_download_url(url_pt, id):
+    """
+    Replace placeholder with values to get actuall url
+
+    Parameters:
+    ----------
+    url_pt: str
+        URL pattern
+    id: str
+        Quad id
+    
+    Returns
+    -------
+    Actuall url
+    """
+    return re.sub('<id>', id, url_pt)
 
 
-def get_quad_path(quad_name, quad_dir, qname, id):
-    filename = re.sub('<quad_dir>', quad_dir, quad_name)
+def get_quad_path(quad_name_pt, quad_dir, qname, id):
+    """
+    Replace placeholder with values to get actuall file path
+
+    Parameters:
+    ----------
+    quad_name_pt: str
+        Pattern of quad file path
+    quad_dir: str
+        Quad directory
+    qname: str
+        quad name by PlanetScope
+    id: str
+        Quad id
+
+    Returns
+    -------
+    filename: str
+        Actuall file path
+    """
+    filename = re.sub('<quad_dir>', quad_dir, quad_name_pt)
     filename = re.sub('<qname>', qname, filename)
     filename = re.sub('<id>', id, filename)
     return filename
