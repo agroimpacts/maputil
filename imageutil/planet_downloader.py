@@ -23,8 +23,32 @@ class PlanetDownloader():
     def __init__(self, quads_gdf=None, geom_path=None) -> None:
         pass
 
-    def get_basemap_grid(self, geom_path=None,  PLANET_API_KEY=None, API_URL=None, dates=None, aoi = None, bbox = None):
+    def get_basemap_grid(self, PLANET_API_KEY, API_URL, geom_path, dates = None, aoi = None, bbox = None):
         """
+        Create a catalog of quads
+        
+        Parameters:
+        ----------
+        PLANET_API_KEY: str
+            PlanetScope API key 
+        API_URL: str
+            The URL for HTTP GET request to list quads
+        geom_path: str
+            File path to quad catalog
+        dates: list
+            List of dates in string format
+            Should be in format 'yyyy-dd' or 'yyyy-dd_yyyy-dd' for a time range
+            Should match the date of downloaded quads
+        bbox: list
+            Coordinates of the area to be queried
+            Should be in format [xmin, ymin, xmax, ymax]   
+        
+        Returns
+        -------
+        quads_gdf: geopandas
+            Quad catalog
+        quads_url: str
+            URL to download quads
         """
         if not os.path.exists(geom_path):
             print(f"{geom_path} does not exist. Creating the file...")
@@ -65,16 +89,46 @@ class PlanetDownloader():
             quads_url = None
         return quads_gdf, quads_url
 
+    
     def download_tiles(
-            self, quads_path, PLANET_API_KEY, 
-            quads_gdf = None, geom_path = None, 
+            self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf = None, geom_path = None, 
             download_url = None, list_quad_URL = None,  dates = None, bbox = None
         ):
+        """
+        Download basemaps from PlanetScope to local server
+        
+        Parameters:
+        ----------
+        PLANET_API_KEY: str
+            PlanetScope API key
+        quads_dir: str
+            File path to quad direcroty
+        quad_name: str
+            Pattern of quad file path
+        quads_gdf: geopandas
+            a geopandas with quads ids and geometry
+        geom_path: str
+            File path to quad catalog
+        download_url: str
+            URL to request and download quads
+        list_quad_url: str
+            URL to list quads from PlanetScope
+        dates: list
+            List of dates in string format
+            Should be in format 'yyyy-dd' or 'yyyy-dd_yyyy-dd' for a time range
+            Should match the date of downloaded quads
+        bbox: list
+            Coordinates of the area to be queried
+            Should be in format [xmin, ymin, xmax, ymax]
+        
+        Returns
+        -------
+        """
         if download_url is not None:
             if quads_gdf is not None:
                 for i, row in quads_gdf.iterrows():
                     link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = f"{quads_path}/{row['fname']}_{row['grid']}.tif" 
+                    filename = f"{quad_dir}/{row['fname']}_{row['grid']}.tif" 
                     download_tiles_helper(link, filename)
                 return
 
@@ -82,7 +136,7 @@ class PlanetDownloader():
                 quads_gdf = gpd.read_file(geom_path)
                 for i, row in quads_gdf.iterrows():
                     link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = f"{quads_path}/{row['fname']}_{row['grid']}.tif" 
+                    filename = f"{quad_dir}/{row['fname']}_{row['grid']}.tif" 
                     download_tiles_helper(link, filename)
                 return
 
@@ -98,15 +152,54 @@ class PlanetDownloader():
                     if i['id'] not in list(quads_gdf['grid']):
                         continue
                 link = i['_links']['download']
-                filename = f"{quads_path}/{mosaic_name}_{i['id']}.tiff" 
+                filename = f"{quad_dir}/{mosaic_name}_{i['id']}.tiff" 
                 download_tiles_helper(link, filename)
             return
 
+    
     def retiler(
         self, tile_dir, quad_dir, temp_dir, tilefile_path, 
         dates, dst_width, dst_height, nbands, dst_crs, dst_img_pt, 
         quads_gdf=None, geom_path=None
     ):
+        """
+        retile quads from quad_dir into smaller tiles and write tiles to tile_dir
+        
+        Parameters:
+        ----------
+        tile_dir : str 
+            Directory to store tiles
+        quad_dir: str
+            Directory storing quads
+        temp_dir: str
+            Directory to create temporary files
+        tilefile_path: str
+            File path to the tile catalog
+        dates: list
+            List of dates in string format
+            Should be in format 'yyyy-dd' or 'yyyy-dd_yyyy-dd' for a time range
+            Should match the date of downloaded quads
+        dst_width : int 
+            The pixel width of the output image
+        dst_height : int
+            The pixel height of the output image
+        nbands : int
+            Number of bands in input images
+        dst_crs : str
+            Code for output CRS, e.g "EPSG:4326"
+        dst_img_pt : str
+            Output file path and name pattern for output geotiff
+        quads_gdf: geopandas
+            geopandas of quads
+        geom_path: str
+            File path to the quad catalog
+
+        
+        Returns
+        -------
+        errors: list
+            A list of error
+        """
 
         if not os.path.isdir(tile_dir):
             os.makedirs(tile_dir)
@@ -137,15 +230,16 @@ class PlanetDownloader():
             for i in range(len(tile_polys_merc)):
                 tile = tile_polys_merc.iloc[[int(i)]]
                 tiles_int = sjoin(tile, nicfi_tile_polys, how='left')
+
+                # Name output file paths
                 tile_id = int(float(tile['tile'].values.flatten()[0]))
                 tile_id_str = f"{tile_id}"
-                print(tile_id_str)
                 dst_img = re.sub('{tile_dir}', tile_dir, dst_img_pt)
                 dst_img = re.sub('{tile_id}', tile_id_str, dst_img)
                 dst_img = re.sub('{date}', date, dst_img)
-                
-                print(dst_img)
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
+
+                # Check if files already exist
                 if os.path.exists(f"{dst_img}") and os.path.exists(f"{dst_cog}"):
                     os.remove(dst_img)
                     continue
@@ -159,15 +253,14 @@ class PlanetDownloader():
                 elif len(nicfi_tiles_int['file']) == 1: 
                     image_list = f"{quad_dir}/{nicfi_tiles_int['file'].values[0]}"
                 else:
-                    print("empty nicfi_tiles_int['file']")
-                    print(i)
+                    print(f"{i}, empty nicfi_tiles_int['file']")
                     errors.append((tile_id, 'empty'))
                     continue
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
                 poly = tile_polys[tile_polys['tile'].isin(tile['tile'])]
                 transform = dst_transform(poly)
 
-                # retile
+                # Retile
                 print(f'Reprojecting and retiling {dst_img}')
                 try:
                     reproject_retile_image(
@@ -197,18 +290,52 @@ class PlanetDownloader():
         return errors
 
 
-def download_tiles_helper(link, filename):
-    # print(f"Downloading: {link}")
+def download_tiles_helper(url, filename):
+    """
+    A helper function to download file to local server
+    
+    Parameters:
+    ----------
+    url : str 
+        The url to download file
+    filename: str
+        File path to where the file will be downloaded to    
+    
+    Returns
+    -------
+    """
     if not os.path.isfile(filename):
-        urllib.request.urlretrieve(link, filename)
+        urllib.request.urlretrieve(url, filename)
         print(f"Downloaded: {filename}")
     else:
         print(f"File already exists: {filename}")
 
 
-def list_quads(PLANET_API_KEY=None, API_URL=None, date=None, bbox = None):
+def list_quads(PLANET_API_KEY, API_URL, date, bbox = None):
     """
     Helper function: actual function to query quads from the Planet API
+    
+    Parameters:
+    ----------
+    PLANET_API_KEY : str 
+        The API key from PlanetScope credential
+    API_URL: str
+        The URL for HTTP GET request to list quads
+    date: str
+        The date to query quads
+        Should be in format 'yyyy-dd' or 'yyyy-dd_yyyy-dd' for a time range
+    bbox: list
+        Coordinates of the area to be queried
+        Should be in format [xmin, ymin, xmax, ymax]
+    
+    Returns
+    -------
+    quads: dict
+        A JSON response 
+    mosaic_name: str
+        The name of queried quads
+    quads_url: str
+        URL pattern to download quads
     """
     session = setup_session(PLANET_API_KEY)
     res = session.get(API_URL, params = {"name__contains" : date})
@@ -226,13 +353,38 @@ def list_quads(PLANET_API_KEY=None, API_URL=None, date=None, bbox = None):
     quads = res.json()
     return quads, mosaic_name, quads_url
 
+
 def setup_session(API_KEY):
+    """
+    Set up a session to later query Planet API
+    
+    Parameters:
+    ----------
+    API_KEY : str 
+        The API key from PlanetScope credential
+    
+    
+    Returns
+    -------
+    A request session
+    """
     session = requests.Session()
     session.auth = (API_KEY, "")
     return session
 
 def get_tempfile_name(temp_dir, file_name = 'mosaic.tif'):
-    """Create a temporary filename in the tmp directory
+    """
+    Create a temporary filename in the tmp directory
+    
+    Parameters:
+    ----------
+    temp_dir : str 
+        File path of the tmp directory
+    
+    
+    Returns
+    -------
+    The full file path of the temporary file
     """
     file_path = os.path.join(
         temp_dir, 
@@ -288,8 +440,8 @@ def reproject_retile_image(
         Code for output CRS, e.g "EPSG:4326"
     file_out : str
         Output file path and name for output geotiff
-    dst_dtype : type
-        Numpy data type (default is int16)
+    dst_dtype : numpy data type
+        (default is int16)
     inmemory : bool
         If a mosaic should be made in memory or not. Default is True. 
         If set to False then a mosaic with the mosaic will be 
