@@ -128,7 +128,7 @@ class PlanetDownloader():
             if quads_gdf is not None:
                 for i, row in quads_gdf.iterrows():
                     link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = f"{quad_dir}/{row['fname']}_{row['grid']}.tif" 
+                    filename = get_quad_path(quad_name, quad_dir, row['fname'], row['grid'])
                     download_tiles_helper(link, filename)
                 return
 
@@ -136,7 +136,7 @@ class PlanetDownloader():
                 quads_gdf = gpd.read_file(geom_path)
                 for i, row in quads_gdf.iterrows():
                     link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = f"{quad_dir}/{row['fname']}_{row['grid']}.tif" 
+                    filename = get_quad_path(quad_name, quad_dir, row['fname'], row['grid'])
                     download_tiles_helper(link, filename)
                 return
 
@@ -152,7 +152,7 @@ class PlanetDownloader():
                     if i['id'] not in list(quads_gdf['grid']):
                         continue
                 link = i['_links']['download']
-                filename = f"{quad_dir}/{mosaic_name}_{i['id']}.tiff" 
+                filename = get_quad_path(quad_name, quad_dir, mosaic_name, i['id'])
                 download_tiles_helper(link, filename)
             return
 
@@ -289,6 +289,12 @@ class PlanetDownloader():
         print("All processed")
         return errors
 
+
+def get_quad_path(quad_name, quad_dir, qname, id):
+    filename = re.sub('{quad_dir}', quad_dir, quad_name)
+    filename = re.sub('{qname}', qname, filename)
+    filename = re.sub('{id}', id, filename)
+    return filename
 
 def download_tiles_helper(url, filename):
     """
