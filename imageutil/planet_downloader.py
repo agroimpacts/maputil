@@ -102,7 +102,11 @@ class PlanetDownloader():
                 download_tiles_helper(link, filename)
             return
 
-    def retiler(self, tile_dir, quad_dir, temp_dir, tilefile_path, dates, quads_gdf=None, geom_path=None, ):
+    def retiler(
+        self, tile_dir, quad_dir, temp_dir, tilefile_path, 
+        dates, dst_width, dst_height, nbands, dst_crs, dst_img_pt, 
+        quads_gdf=None, geom_path=None
+    ):
 
         if not os.path.isdir(tile_dir):
             os.makedirs(tile_dir)
@@ -117,7 +121,10 @@ class PlanetDownloader():
                 raise ValueError("Provide nicfi gdf or path to nicfi geojson")
         if 'file' not in quads_gdf.columns:
             try:
-                quads_gdf['file'] = quads_gdf.apply(lambda x: f"planet_medres_normalized_analytic_{x['date']}_mosaic_{x['tile']}.tif", axis=1)
+                quads_gdf['file'] = quads_gdf.apply(lambda
+                    x: f"planet_medres_normalized_analytic_{x['date']}_mosaic_{x['tile']}.tif", 
+                    axis=1
+                )
             except KeyError:
                 raise KeyError("Make sure the quads_gdf has 'tile' and date 'columns'")
         
@@ -131,7 +138,13 @@ class PlanetDownloader():
                 tile = tile_polys_merc.iloc[[int(i)]]
                 tiles_int = sjoin(tile, nicfi_tile_polys, how='left')
                 tile_id = int(float(tile['tile'].values.flatten()[0]))
-                dst_img = f"{tile_dir}/tile{tile_id}_{date}_buf179.tif"
+                tile_id_str = f"{tile_id}"
+                print(tile_id_str)
+                dst_img = re.sub('{tile_dir}', tile_dir, dst_img_pt)
+                dst_img = re.sub('{tile_id}', tile_id_str, dst_img)
+                dst_img = re.sub('{date}', date, dst_img)
+                
+                print(dst_img)
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
                 if os.path.exists(f"{dst_img}") and os.path.exists(f"{dst_cog}"):
                     os.remove(dst_img)
@@ -157,7 +170,10 @@ class PlanetDownloader():
                 # retile
                 print(f'Reprojecting and retiling {dst_img}')
                 try:
-                    reproject_retile_image(image_list, transform, 2358, 2358, 4, "EPSG:4326", dst_img, temp_dir, inmemory=False)
+                    reproject_retile_image(
+                        image_list, transform, dst_width, dst_height, nbands, dst_crs, 
+                        dst_img, temp_dir, inmemory=False
+                    )
                 except Exception as e:
                     print(repr(e))
                     errors.append(repr(e))
