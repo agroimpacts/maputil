@@ -15,6 +15,11 @@ def main(config_path):
     tile_dir = config['tile_dir']
     temp_dir = config['temp_dir']
     tilefile_path = config['tilefile_path']
+    dst_width = config['dst_width']
+    dst_height = config['dst_height']
+    nbands = config['nbands']
+    dst_crs = config['dst_crs']
+    dst_img_pt = config['dst_img_pt']
 
     aoi = gpd.read_file(config['geom'])[['geometry']].dissolve()
     downloader = PlanetDownloader()
@@ -32,7 +37,11 @@ def main(config_path):
             download_url = quads_url, list_quad_URL = list_quad_URL, dates = dates, bbox = bbox
         )
     if config['doRetile']:
-        errors = downloader.retiler(tile_dir, quad_dir, temp_dir, tilefile_path, dates, quads_gdf)
+        errors = downloader.retiler(
+            tile_dir, quad_dir, temp_dir, tilefile_path, dates, 
+            dst_width, dst_height, nbands, dst_crs, dst_img_pt, quads_gdf
+        )
+        print(f"errors: {errors}")
 
 if __name__ =='__main__':
     main('config/config.yml')
