@@ -20,7 +20,7 @@ from rasterio.warp import reproject, Resampling
 
 
 class PlanetDownloader():
-    def __init__(self, quads_gdf=None, geom_path=None) -> None:
+    def __init__(self) -> None:
         pass
 
     def get_basemap_grid(self, PLANET_API_KEY, API_URL, geom_path, dates = None, aoi = None, bbox = None):
