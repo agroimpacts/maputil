@@ -126,19 +126,15 @@ class PlanetDownloader():
         """
         if download_url is not None:
             if quads_gdf is not None:
-                for i, row in quads_gdf.iterrows():
-                    link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = get_quad_path(quad_name, quad_dir, row['fname'], row['grid'])
-                    download_tiles_helper(link, filename)
-                return
-
-            if geom_path is not None:
+                pass
+            elif geom_path is not None:
                 quads_gdf = gpd.read_file(geom_path)
-                for i, row in quads_gdf.iterrows():
-                    link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
-                    filename = get_quad_path(quad_name, quad_dir, row['fname'], row['grid'])
-                    download_tiles_helper(link, filename)
-                return
+                
+            for i, row in quads_gdf.iterrows():
+                link = f"{download_url}/{row['grid']}/full?api_key={PLANET_API_KEY}"
+                filename = get_quad_path(quad_name, quad_dir, row['fname'], row['grid'])
+                download_tiles_helper(link, filename)
+            return
 
         else:
             if list_quad_URL is None:
