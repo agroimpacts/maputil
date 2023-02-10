@@ -17,3 +17,19 @@ nbands: 4
 dst_crs: 'EPSG:4326'
 quad_name: "<quad_dir>/<qname>_<id>.tif"
 tile_name: "<tile_dir>/tile<tile_id>_<date>_buf179.tif"
+
+AWS:
+  aws_access:
+  aws_region: us-east-1
+  aws_secret:
+
+# Rasterization
+Rasterize_Labels:
+  raster_mode: binary #three_class or binary
+  dir_grids: data/ghana_grid.csv
+  dir_catalog: data/catalog_rasterize_test.csv
+  dir_out: data/labels_test
+  col_shapefile: dir_segment
+  crs_epsg: 4326
+  resolution: 2.5e-5
+  diam: 0.0025
