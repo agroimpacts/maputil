@@ -1,6 +1,7 @@
 # Data
 /geemap-env
 /data
+*ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
