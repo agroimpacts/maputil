@@ -165,7 +165,7 @@ def write_binary_by_grid(grid_df, col_shp, resolution, diam, crs, dir_out, s3_cl
             dst.write_band(1, out)
 
 
-def get_rasterization(params, run_local):
+def rasterize_labels(params, run_local):
 
     mode = params['raster_mode']
     assert mode in ['three_class', 'binary']
