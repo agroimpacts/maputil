@@ -21,8 +21,10 @@ def main(config_path):
     dst_crs = config['dst_crs']
     quad_name = config['quad_name']
     tile_name = config['tile_name']
-
-    aoi = gpd.read_file(config['geom'])[['geometry']].dissolve()
+    try:
+        aoi = gpd.read_file(config['geom'])[['geometry']].dissolve()
+    except:
+        aoi = None
     downloader = PlanetDownloader()
     if config['doGetGrid']:
         quads_gdf, quads_url = downloader.get_basemap_grid (
