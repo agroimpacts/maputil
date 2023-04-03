@@ -1,6 +1,7 @@
+doGetGrid: False
 doDownload: False
 doRetile: True
-key: c1e1934332cc4bafa0c8c61c0f14ab20
+key: ""
 list_quad_url: 'https://api.planet.com/basemaps/v1/mosaics'
 geom: data/ghana_november_quads_nicfi_mini.geojson
 dates: ['2019-06_2019-11']
@@ -13,4 +14,5 @@ dst_width: 2358
 dst_height: 2358
 nbands: 4
 dst_crs: 'EPSG:4326'
-dst_img_pt: "{tile_dir}/tile{tile_id}_{date}_buf179.tif"
+quad_name: "<quad_dir>/<qname>_<id>.tif"
+tile_name: "<tile_dir>/tile<tile_id>_<date>_buf179.tif"

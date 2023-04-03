@@ -1,4 +1,4 @@
-from imageutil import *
+from maputil import *
 import yaml
 
 
@@ -19,27 +19,26 @@ def main(config_path):
     dst_height = config['dst_height']
     nbands = config['nbands']
     dst_crs = config['dst_crs']
-    dst_img_pt = config['dst_img_pt']
+    quad_name = config['quad_name']
+    tile_name = config['tile_name']
 
     aoi = gpd.read_file(config['geom'])[['geometry']].dissolve()
     downloader = PlanetDownloader()
-    quads_gdf, quads_url = downloader.get_basemap_grid (
-                                            geom_path = geom_path, 
-                                            PLANET_API_KEY = PLANET_API_KEY, 
-                                            API_URL = list_quad_URL,
-                                            dates = dates,
-                                            aoi = aoi,
-                                            bbox = bbox
-                                        )
+    if config['doGetGrid']:
+        quads_gdf, quads_url = downloader.get_basemap_grid (
+            PLANET_API_KEY, list_quad_URL,geom_path, dates = dates, aoi = aoi,bbox = bbox
+        )
     if config['doDownload']:
+        if quads_url is not None:
+            quads_url = f"{quads_url}/<id>/full?api_key={PLANET_API_KEY}"
         downloader.download_tiles(
-            quad_dir, PLANET_API_KEY, quads_gdf = quads_gdf, 
+            PLANET_API_KEY, quad_dir, quad_name, quads_gdf = quads_gdf, 
             download_url = quads_url, list_quad_URL = list_quad_URL, dates = dates, bbox = bbox
         )
     if config['doRetile']:
         errors = downloader.retiler(
             tile_dir, quad_dir, temp_dir, tilefile_path, dates, 
-            dst_width, dst_height, nbands, dst_crs, dst_img_pt, quads_gdf
+            dst_width, dst_height, nbands, dst_crs, tile_name, quads_gdf
         )
         print(f"errors: {errors}")
 
