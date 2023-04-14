@@ -1,11 +1,14 @@
-doGetGrid: False
-doDownload: False
-doRetile: True
+doGetGrid: True
+doDownload: True
+doRetile: False
 key: ""
 list_quad_url: 'https://api.planet.com/basemaps/v1/mosaics'
-geom: data/ghana_november_quads_nicfi_mini.geojson
+geom_path: data/tiles_nicfi.geojson
+catalog_path: data/tz_catalog.geojson
+catalog_temp_dir : data/catalog_temp
 dates: ['2019-06_2019-11']
-bbox: [-2.87993585, 10.83330598,  0.0300383 , 11.17329979]
+bbox: [29.3399975929, -11.7209380022, 40.31659, -0.95]
+batch_size: 50
 quad_dir: data/quads
 tile_dir: data/tiles
 temp_dir: data/temp
