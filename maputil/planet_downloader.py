@@ -6,6 +6,7 @@ import urllib
 from subprocess import run
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 import geopandas as gpd
 from geopandas.tools import sjoin
 from shapely.geometry import box
@@ -23,7 +24,7 @@ class PlanetDownloader():
     def __init__(self) -> None:
         pass
 
-    def get_basemap_grid(self, PLANET_API_KEY, API_URL, geom_path, dates = None, aoi = None, bbox = None):
+    def get_basemap_grid(self, PLANET_API_KEY, API_URL, catalog_path, dates = None, aoi = None, bbox = None):
         """
         Create a catalog of quads
         
@@ -33,12 +34,14 @@ class PlanetDownloader():
             PlanetScope API key 
         API_URL: str
             The URL for HTTP GET request to list quads
-        geom_path: str
+        catalog_path: str
             File path to quad catalog
         dates: list
             List of dates in string format
             Should be in format 'yyyy-dd' or 'yyyy-dd_yyyy-dd' for a time range
             Should match the date of downloaded quads
+        aoi: geopandas
+            Area of interest
         bbox: list
             Coordinates of the area to be queried
             Should be in format [xmin, ymin, xmax, ymax]   
@@ -50,8 +53,8 @@ class PlanetDownloader():
         quads_url: str
             URL to download quads
         """
-        if not os.path.exists(geom_path):
-            print(f"{geom_path} does not exist. Creating the file...")
+        if not os.path.exists(catalog_path):
+            print(f"{catalog_path} does not exist. Creating the catalog...")
 
             ids = []
             dts = []
@@ -68,6 +71,7 @@ class PlanetDownloader():
 
             for date in dates:
                 quads, mosaic_name, quads_url = list_quads(PLANET_API_KEY, API_URL, date, bbox)
+                print(f"Querying {len(quads['items'])} quads")
                 for quad in quads['items']:
                     ids.append(quad['id'])
                     geometries.append(box(quad['bbox'][0], quad['bbox'][1], quad['bbox'][2], quad['bbox'][3]))
@@ -80,18 +84,18 @@ class PlanetDownloader():
                 if aoi is not None:
                     quads_gdf = gpd.overlay(aoi, quads_gdf)
                     quads_gdf = gpd.sjoin(left_df=quads_gdf, right_df=aoi).drop(columns=['index_right'])
-                if geom_path is not None:
-                    quads_gdf.to_file(geom_path, driver='GeoJSON')
-                    print(f"{geom_path} created")
+                if catalog_path is not None:
+                    quads_gdf.to_file(catalog_path, driver='GeoJSON')
+                    print(f"{catalog_path} created")
         else:
-            print(f"Read {geom_path}")
-            quads_gdf = gpd.read_file(geom_path)
+            print(f"Read {catalog_path}")
+            quads_gdf = gpd.read_file(catalog_path)
             quads_url = None
         return quads_gdf, quads_url
 
     
     def download_tiles(
-            self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf = None, geom_path = None, 
+            self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf = None, catalog_path = None, 
             download_url = None, list_quad_URL = None,  dates = None, bbox = None
         ):
         """
@@ -107,7 +111,7 @@ class PlanetDownloader():
             Pattern of quad file path
         quads_gdf: geopandas
             a geopandas with quads ids and geometry
-        geom_path: str
+        catalog_path: str
             File path to quad catalog
         download_url: str
             URL to request and download quads
@@ -127,8 +131,8 @@ class PlanetDownloader():
         if download_url is not None:
             if quads_gdf is not None:
                 pass
-            elif geom_path is not None:
-                quads_gdf = gpd.read_file(geom_path)
+            elif catalog_path is not None:
+                quads_gdf = gpd.read_file(catalog_path)
 
             for i, row in quads_gdf.iterrows():
                 link = get_quad_download_url(download_url, {row['tile']})
@@ -156,7 +160,7 @@ class PlanetDownloader():
     def retiler(
         self, tile_dir, quad_dir, temp_dir, tilefile_path, 
         dates, dst_width, dst_height, nbands, dst_crs, dst_img_pt, 
-        quads_gdf=None, geom_path=None
+        quads_gdf=None, catalog_path=None
     ):
         """
         retile quads from quad_dir into smaller tiles and write tiles to tile_dir
@@ -187,7 +191,7 @@ class PlanetDownloader():
             Output file path and name pattern for output geotiff
         quads_gdf: geopandas
             geopandas of quads
-        geom_path: str
+        catalog_path: str
             File path to the quad catalog
 
         
@@ -204,8 +208,8 @@ class PlanetDownloader():
             {"tile": "str", "tile_col": "int", "tile_row": "int"}
         )
         if quads_gdf is None:
-            if geom_path:
-                quads_gdf = gpd.read_file(geom_path)
+            if catalog_path:
+                quads_gdf = gpd.read_file(catalog_path)
             else:
                 raise ValueError("Provide nicfi gdf or path to nicfi geojson")
         if 'file' not in quads_gdf.columns:
@@ -352,7 +356,7 @@ def download_tiles_helper(url, filename):
         print(f"File already exists: {filename}")
 
 
-def list_quads(PLANET_API_KEY, API_URL, date, bbox = None):
+def list_quads(PLANET_API_KEY, API_URL, date, bbox = None, _page_size=250):
     """
     Helper function: actual function to query quads from the Planet API
     
@@ -390,7 +394,8 @@ def list_quads(PLANET_API_KEY, API_URL, date, bbox = None):
         bbox_str = ','.join(map(str, bbox))
     # List mosaics
     quads_url = f"{API_URL}/{mosaic_id}/quads"
-    res = session.get(quads_url, params={'bbox': bbox_str,'minimal': True}, stream=True)
+    params = {'bbox': bbox_str,'minimal': True, '_page_size': _page_size}
+    res = session.get(quads_url, params=params, stream=True)
     quads = res.json()
     return quads, mosaic_name, quads_url
 
