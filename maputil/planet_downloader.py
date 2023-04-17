@@ -72,7 +72,6 @@ class PlanetDownloader():
 
             for date in dates:
                 quads, mosaic_name, quads_url = list_quads(PLANET_API_KEY, API_URL, date, bbox)
-                print(f"Querying {len(quads['items'])} quads")
                 for quad in quads['items']:
                     ids.append(quad['id'])
                     geometries.append(box(quad['bbox'][0], quad['bbox'][1], quad['bbox'][2], quad['bbox'][3]))
@@ -136,6 +135,7 @@ class PlanetDownloader():
                 quads_gdf = gpd.read_file(catalog_path)
 
             for i, row in quads_gdf.iterrows():
+                print(i)
                 link = get_quad_download_url(download_url, {row['tile']})
                 filename = get_quad_path(quad_name, quad_dir, row['fname'], row['tile'])
                 download_tiles_helper(link, filename)
@@ -148,14 +148,15 @@ class PlanetDownloader():
                 raise ValueError('Must supply dates to query quads')
             for date in dates:
                 quads, mosaic_name, _ = list_quads(PLANET_API_KEY, list_quad_URL, date, bbox)
-            for i in quads['items']:
-                if quads_gdf is not None:
-                    if i['id'] not in list(quads_gdf['tile']):
-                        continue
-                link = i['_links']['download']
-                filename = get_quad_path(quad_name, quad_dir, mosaic_name, i['id'])
-                download_tiles_helper(link, filename)
-            return
+                for idx, i in enumerate(quads['items']):
+                    print(idx)
+                    if quads_gdf is not None:
+                        if i['id'] not in list(quads_gdf['tile']):
+                            continue
+                    link = i['_links']['download']
+                    filename = get_quad_path(quad_name, quad_dir, mosaic_name, i['id'])
+                    download_tiles_helper(link, filename)
+                return
 
     
     def retiler(
