@@ -52,11 +52,13 @@ def main(config_path):
                             PLANET_API_KEY, list_quad_URL, temp_file, 
                             dates = dates, bbox = bbox_aoi
                         )
+                        quads_gdf = gpd.overlay(aoi, quads_gdf)
+                        quads_gdf = gpd.sjoin(left_df=quads_gdf, right_df=aoi).drop(columns=['index_right'])
                 print(f"Merging temp catalogs")
                 gdfs = [gpd.read_file(Path(catalog_temp_dir)/f) for f in os.listdir(catalog_temp_dir)]
                 gdf = pd.concat(gdfs).pipe(gpd.GeoDataFrame)
                 quads_gdf = gpd.overlay(aoi, gdf)
-                quads_gdf = gpd.sjoin(left_df=gdf, right_df=aoi).drop(columns=['index_right'])
+                quads_gdf = gpd.sjoin(left_df=quads_gdf, right_df=aoi).drop(columns=['index_right'])
         
                 print(f"Saving catalog {catalog_path}")
                 quads_gdf.to_file(catalog_path)
@@ -70,13 +72,24 @@ def main(config_path):
     if config['doDownload']:
         if not os.path.isdir(quad_dir):
             os.mkdir(quad_dir)
-        quads_gdf = gpd.read_file(catalog_path)
         if quads_url:
             quads_url = f"{quads_url}/<id>/full?api_key={PLANET_API_KEY}"
-        downloader.download_tiles(
-            PLANET_API_KEY, quad_dir, quad_name, quads_gdf = quads_gdf, 
-            download_url = quads_url, list_quad_URL = list_quad_URL, dates = dates, bbox = bbox
-        )
+        if batch_size and batch_size > 0:
+            for mini_cat in os.listdir(catalog_temp_dir):
+                print(f"Downloading from {mini_cat}")
+                mini_cat_path = Path(catalog_temp_dir) / mini_cat
+                quads_gdf = gpd.read_file(mini_cat_path)
+                downloader.download_tiles(
+                    PLANET_API_KEY, quad_dir, quad_name, quads_gdf = quads_gdf, 
+                    download_url = quads_url, list_quad_URL = list_quad_URL, dates = dates, bbox = bbox
+                )
+        else:
+            quads_gdf = gpd.read_file(catalog_path)
+            print(f"Downloading {len(quads_gdf.index)} quads")
+            downloader.download_tiles(
+                PLANET_API_KEY, quad_dir, quad_name, quads_gdf = quads_gdf, 
+                download_url = quads_url, list_quad_URL = list_quad_URL, dates = dates, bbox = bbox
+            )
 
     if config['doRetile']:
         if not os.path.isdir(tile_dir):
