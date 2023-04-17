@@ -68,6 +68,8 @@ def main(config_path):
                 )
         
     if config['doDownload']:
+        if not os.path.isdir(quad_dir):
+            os.mkdir(quad_dir)
         quads_gdf = gpd.read_file(catalog_path)
         if quads_url:
             quads_url = f"{quads_url}/<id>/full?api_key={PLANET_API_KEY}"
@@ -77,6 +79,10 @@ def main(config_path):
         )
 
     if config['doRetile']:
+        if not os.path.isdir(tile_dir):
+            os.mkdir(tile_dir)
+        if not os.path.isdir(temp_dir):
+            os.mkdir(temp_dir)
         errors = downloader.retiler(
             tile_dir, quad_dir, temp_dir, tilefile_path, dates, 
             dst_width, dst_height, nbands, dst_crs, tile_name, quads_gdf
