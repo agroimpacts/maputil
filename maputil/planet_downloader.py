@@ -24,7 +24,7 @@ class PlanetDownloader():
     def __init__(self) -> None:
         pass
 
-    def get_basemap_grid(self, PLANET_API_KEY, API_URL, catalog_path, dates = None, aoi = None, bbox = None):
+    def get_basemap_grid(self, PLANET_API_KEY, API_URL, catalog_path=None, dates = None, aoi = None, bbox = None):
         """
         Create a catalog of quads
         
@@ -36,6 +36,7 @@ class PlanetDownloader():
             The URL for HTTP GET request to list quads
         catalog_path: str
             File path to quad catalog
+            If None, will not output a catalog file
         dates: list
             List of dates in string format
             Should be in format 'yyyy-dd' or 'yyyy-dd_yyyy-dd' for a time range
@@ -53,7 +54,7 @@ class PlanetDownloader():
         quads_url: str
             URL to download quads
         """
-        if not os.path.exists(catalog_path):
+        if catalog_path is None or not os.path.exists(catalog_path):
             print(f"{catalog_path} does not exist. Creating the catalog...")
 
             ids = []
