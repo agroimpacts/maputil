@@ -5,7 +5,7 @@ key: ""
 list_quad_url: 'https://api.planet.com/basemaps/v1/mosaics'
 geom_path: data/tiles_nicfi.geojson
 catalog_path: data/tz_catalog.geojson
-catalog_temp_dir : data/catalog_temp
+catalog_temp_dir : data/catalog_temp_2019_11
 dates: ['2019-06_2019-11']
 bbox: [29.3399975929, -11.7209380022, 40.31659, -0.95]
 batch_size: 50
