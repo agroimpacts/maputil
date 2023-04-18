@@ -135,7 +135,6 @@ class PlanetDownloader():
                 quads_gdf = gpd.read_file(catalog_path)
 
             for i, row in quads_gdf.iterrows():
-                print(i)
                 link = get_quad_download_url(download_url, {row['tile']})
                 filename = get_quad_path(quad_name, quad_dir, row['fname'], row['tile'])
                 download_tiles_helper(link, filename)
@@ -149,7 +148,6 @@ class PlanetDownloader():
             for date in dates:
                 quads, mosaic_name, _ = list_quads(PLANET_API_KEY, list_quad_URL, date, bbox)
                 for idx, i in enumerate(quads['items']):
-                    print(idx)
                     if quads_gdf is not None:
                         if i['id'] not in list(quads_gdf['tile']):
                             continue
