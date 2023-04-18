@@ -41,6 +41,7 @@ def main(config_path):
     if config['doGetGrid']:
         if not os.path.isfile(catalog_path):
             if batch_size and batch_size > 0:
+                assert len(dates) == 1, "Download 1 date at a time with batch'"
                 if not os.path.isdir(catalog_temp_dir):
                     os.mkdir(catalog_temp_dir)
 
