@@ -387,7 +387,11 @@ def list_quads(PLANET_API_KEY, API_URL, date, bbox = None, _page_size=250):
     session = setup_session(PLANET_API_KEY)
     res = session.get(API_URL, params = {"name__contains" : date})
     mosaic = res.json()
-    mosaic_id = mosaic['mosaics'][0]['id']
+    try:
+        mosaic_id = mosaic['mosaics'][0]['id']
+    except Exception as e:
+        print(mosaic['message'])
+        raise e
     mosaic_name =  mosaic['mosaics'][0]['name']
     if bbox is None:
         mosaic_bbox = mosaic['mosaics'][0]['bbox']
