@@ -148,7 +148,7 @@ class PlanetDownloader():
 
             for i, row in quads_gdf.iterrows():
                 print(i)
-                link = get_quad_download_url(download_url, {row['tile']})
+                link = get_quad_download_url(download_url, row['tile'])
                 filename = get_quad_path(quad_name, quad_dir, row['file'], 
                                          row['tile'])
                 download_tiles_helper(link, filename)
