@@ -106,9 +106,9 @@ class PlanetDownloader():
 
     
     def download_tiles(
-            self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf = None, 
-            catalog_path = None, download_url = None, list_quad_URL = None,  
-            dates = None, bbox = None
+            self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf=None, 
+            catalog_path=None, download_url=None, list_quad_URL=None,  
+            dates=None, bbox=None
         ):
         """
         Download basemaps from PlanetScope to local server
@@ -244,7 +244,7 @@ class PlanetDownloader():
         errors = []
         for date in dates:
             print(f"Date: {date}")
-            nicfi_tile_polys = quads_gdf[quads_gdf['date']== date]
+            nicfi_tile_polys = quads_gdf[quads_gdf['date'] == date]
             tile_polys_merc = tile_polys.to_crs(nicfi_tile_polys.crs)
 
             for i in range(len(tile_polys_merc)):
@@ -382,7 +382,7 @@ def download_tiles_helper(url, filename):
         print(f"File already exists: {filename}")
 
 
-def list_quads(PLANET_API_KEY, API_URL, date, bbox = None, _page_size=250):
+def list_quads(PLANET_API_KEY, API_URL, date, bbox=None, _page_size=250):
     """
     Helper function: actual function to query quads from the Planet API
     
@@ -448,7 +448,7 @@ def setup_session(API_KEY):
     session.auth = (API_KEY, "")
     return session
 
-def get_tempfile_name(temp_dir, file_name = 'mosaic.tif'):
+def get_tempfile_name(temp_dir, file_name='mosaic.tif'):
     """
     Create a temporary filename in the tmp directory
     
@@ -493,7 +493,7 @@ def dst_transform(poly, res = 0.005 / 200):
 
 def reproject_retile_image(
     src_images, dst_transform, dst_width, dst_height, nbands, dst_crs,
-    fileout, temp_dir, dst_dtype = np.int16, inmemory = True, cleanup=True):
+    fileout, temp_dir, dst_dtype=np.int16, inmemory=True, cleanup=True):
     """Takes an input images or list of images and merges (if several) and 
     reprojects and retiles it to align to the resolution and extent defined by
     an polygon and associated transform

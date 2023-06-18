@@ -53,7 +53,7 @@ def main(config_path):
                         bbox_aoi = g.total_bounds 
                         quads_gdf, quads_url = downloader.get_basemap_grid (
                             PLANET_API_KEY, list_quad_URL, temp_file, 
-                            dates = dates, bbox = bbox_aoi
+                            dates=dates, bbox=bbox_aoi
                         )
                         quads_gdf = gpd.overlay(aoi, quads_gdf)
                         quads_gdf = gpd.sjoin(left_df=quads_gdf, right_df=aoi)\
@@ -72,7 +72,7 @@ def main(config_path):
             else:
                 quads_gdf, quads_url = downloader.get_basemap_grid (
                     PLANET_API_KEY, list_quad_URL, catalog_path, 
-                    dates = dates, aoi = aoi, bbox = bbox
+                    dates=dates, aoi=aoi, bbox=bbox
                 )
         
     if config['doDownload']:
@@ -86,17 +86,17 @@ def main(config_path):
                 mini_cat_path = Path(catalog_temp_dir) / mini_cat
                 quads_gdf = gpd.read_file(mini_cat_path)
                 downloader.download_tiles(
-                    PLANET_API_KEY, quad_dir, quad_name, quads_gdf = quads_gdf, 
-                    download_url = quads_url, list_quad_URL = list_quad_URL, 
-                    dates = dates, bbox = bbox
+                    PLANET_API_KEY, quad_dir, quad_name, quads_gdf=quads_gdf, 
+                    download_url=quads_url, list_quad_URL=list_quad_URL, 
+                    dates=dates, bbox=bbox
                 )
         else:
             quads_gdf = gpd.read_file(catalog_path)
             print(f"Downloading {len(quads_gdf.index)} quads")
             downloader.download_tiles(
-                PLANET_API_KEY, quad_dir, quad_name, quads_gdf = quads_gdf, 
-                download_url = quads_url, list_quad_URL = list_quad_URL, 
-                dates = dates, bbox = bbox
+                PLANET_API_KEY, quad_dir, quad_name, quads_gdf=quads_gdf, 
+                download_url=quads_url, list_quad_URL=list_quad_URL, 
+                dates=dates, bbox=bbox
             )
 
     if config['doRetile']:
