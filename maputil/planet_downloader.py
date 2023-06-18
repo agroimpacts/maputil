@@ -24,7 +24,8 @@ class PlanetDownloader():
     def __init__(self) -> None:
         pass
 
-    def get_basemap_grid(self, PLANET_API_KEY, API_URL, catalog_path=None, dates = None, aoi = None, bbox = None):
+    def get_basemap_grid(self, PLANET_API_KEY, API_URL, catalog_path=None, 
+                         dates=None, aoi=None, bbox=None, _page_size=250):
         """
         Create a catalog of quads
         
@@ -45,7 +46,9 @@ class PlanetDownloader():
             Area of interest
         bbox: list
             Coordinates of the area to be queried
-            Should be in format [xmin, ymin, xmax, ymax]   
+            Should be in format [xmin, ymin, xmax, ymax]
+        _page_size: int
+            Number of results to return per page
         
         Returns
         -------
@@ -63,27 +66,35 @@ class PlanetDownloader():
             geometries = []
 
             if PLANET_API_KEY is None or  API_URL is None:
-                raise ValueError('Provide Planet API key and API URL to query mosaics')
+                raise ValueError('Provide Planet API key and API URL to query \
+                                 mosaics')
 
             if bbox is None:
                 if aoi is None:
-                    raise ValueError('Provide at least an aoi or a bbox to query mosaics')
+                    raise ValueError('Provide at least an aoi or a bbox to \
+                                     query mosaics')
                 bbox = aoi.total_bounds
 
             for date in dates:
-                quads, mosaic_name, quads_url = list_quads(PLANET_API_KEY, API_URL, date, bbox)
+                quads, mosaic_name, quads_url = list_quads(
+                    PLANET_API_KEY, API_URL, date, bbox, _page_size
+                )
                 for quad in quads['items']:
                     ids.append(quad['id'])
-                    geometries.append(box(quad['bbox'][0], quad['bbox'][1], quad['bbox'][2], quad['bbox'][3]))
+                    geometries.append(box(quad['bbox'][0], quad['bbox'][1], 
+                                          quad['bbox'][2], quad['bbox'][3]))
                     dts.append(date)
                     names.append(f"{mosaic_name}_{quad['id']}")
 
                 # Create the catalog
-                quads_gdf = gpd.GeoDataFrame({'tile': ids, "date": dts, 'geometry': geometries, 'file':names}, 
-                                            crs="EPSG:4326")
+                quads_gdf = gpd.GeoDataFrame(
+                    {'tile': ids, "date": dts, 'geometry': geometries, 
+                     'file':names}, crs="EPSG:4326"
+                )
                 if aoi is not None:
                     quads_gdf = gpd.overlay(aoi, quads_gdf)
-                    quads_gdf = gpd.sjoin(left_df=quads_gdf, right_df=aoi).drop(columns=['index_right'])
+                    quads_gdf = gpd.sjoin(left_df=quads_gdf, right_df=aoi)\
+                        .drop(columns=['index_right'])
                 if catalog_path is not None:
                     quads_gdf.to_file(catalog_path, driver='GeoJSON')
                     print(f"{catalog_path} created")
@@ -95,8 +106,9 @@ class PlanetDownloader():
 
     
     def download_tiles(
-            self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf = None, catalog_path = None, 
-            download_url = None, list_quad_URL = None,  dates = None, bbox = None
+            self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf = None, 
+            catalog_path = None, download_url = None, list_quad_URL = None,  
+            dates = None, bbox = None
         ):
         """
         Download basemaps from PlanetScope to local server
@@ -137,7 +149,8 @@ class PlanetDownloader():
             for i, row in quads_gdf.iterrows():
                 print(i)
                 link = get_quad_download_url(download_url, {row['tile']})
-                filename = get_quad_path(quad_name, quad_dir, row['fname'], row['tile'])
+                filename = get_quad_path(quad_name, quad_dir, row['fname'], 
+                                         row['tile'])
                 download_tiles_helper(link, filename)
             return
 
@@ -147,14 +160,16 @@ class PlanetDownloader():
             if dates is None:
                 raise ValueError('Must supply dates to query quads')
             for date in dates:
-                quads, mosaic_name, _ = list_quads(PLANET_API_KEY, list_quad_URL, date, bbox)
+                quads, mosaic_name, _ = list_quads(PLANET_API_KEY, 
+                                                   list_quad_URL, date, bbox)
                 for idx, i in enumerate(quads['items']):
                     print(idx)
                     if quads_gdf is not None:
                         if i['id'] not in list(quads_gdf['tile']):
                             continue
                     link = i['_links']['download']
-                    filename = get_quad_path(quad_name, quad_dir, mosaic_name, i['id'])
+                    filename = get_quad_path(quad_name, quad_dir, mosaic_name, 
+                                             i['id'])
                     download_tiles_helper(link, filename)
                 return
 
@@ -165,7 +180,8 @@ class PlanetDownloader():
         quads_gdf=None, catalog_path=None
     ):
         """
-        retile quads from quad_dir into smaller tiles and write tiles to tile_dir
+        retile quads from quad_dir into smaller tiles and write tiles to 
+        tile_dir
         
         Parameters:
         ----------
@@ -217,11 +233,13 @@ class PlanetDownloader():
         if 'file' not in quads_gdf.columns:
             try:
                 quads_gdf['file'] = quads_gdf.apply(lambda
-                    x: f"planet_medres_normalized_analytic_{x['date']}_mosaic_{x['tile']}.tif", 
+                    x: f"planet_medres_normalized_analytic_{x['date']}_mosaic_\
+                        {x['tile']}.tif", 
                     axis=1
                 )
             except KeyError:
-                raise KeyError("Make sure the quads_gdf has 'tile' and date 'columns'")
+                raise KeyError("Make sure the quads_gdf has 'tile' and\
+                               date 'columns'")
         
         errors = []
         for date in dates:
@@ -242,18 +260,23 @@ class PlanetDownloader():
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
 
                 # Check if files already exist
-                if os.path.exists(f"{dst_img}") and os.path.exists(f"{dst_cog}"):
+                if os.path.exists(f"{dst_img}") and \
+                    os.path.exists(f"{dst_cog}"):
                     os.remove(dst_img)
                     continue
                 if os.path.exists(f"{dst_cog}"):
                     # print(f"{tile_id} skipped")
                     continue
 
-                nicfi_tiles_int = nicfi_tile_polys[nicfi_tile_polys['file'].isin(tiles_int['file'])]
+                nicfi_tiles_int = nicfi_tile_polys[
+                    nicfi_tile_polys['file'].isin(tiles_int['file'])
+                ]
                 if len(nicfi_tiles_int['file']) > 1:
-                    image_list = [f'{quad_dir}/{file}'for file in nicfi_tiles_int['file']]
+                    image_list = [f'{quad_dir}/{file}' 
+                                  for file in nicfi_tiles_int['file']]
                 elif len(nicfi_tiles_int['file']) == 1: 
-                    image_list = f"{quad_dir}/{nicfi_tiles_int['file'].values[0]}"
+                    image_list = f"{quad_dir}/\
+                        {nicfi_tiles_int['file'].values[0]}"
                 else:
                     print(f"{i}, empty nicfi_tiles_int['file']")
                     errors.append((tile_id, 'empty'))
@@ -266,15 +289,16 @@ class PlanetDownloader():
                 print(f'Reprojecting and retiling {dst_img}')
                 try:
                     reproject_retile_image(
-                        image_list, transform, dst_width, dst_height, nbands, dst_crs, 
-                        dst_img, temp_dir, inmemory=False
+                        image_list, transform, dst_width, dst_height, nbands, 
+                        dst_crs, dst_img, temp_dir, inmemory=False
                     )
                 except Exception as e:
                     print(repr(e))
                     errors.append(repr(e))
 
                 # cogification
-                cmd = ['rio', 'cogeo', 'create', '-b', '1,2,3,4', dst_img, dst_cog]
+                cmd = ['rio', 'cogeo', 'create', '-b', '1,2,3,4', dst_img, 
+                       dst_cog]
                 p = run(cmd, capture_output=True)
                 msg = p.stderr.decode().split('\n')
                 print(f'...{msg[-2]}')
@@ -508,7 +532,8 @@ def reproject_retile_image(
     """
     
     
-    def reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype): 
+    def reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, 
+                         dst_dtype): 
         src_kwargs = src.meta.copy()  # get metadata
         kwargs = src_kwargs
         kwargs.update({
@@ -562,8 +587,10 @@ def reproject_retile_image(
                 with memfile.open(**out_meta) as dst:
                     dst.write(mosaic)
 
-                print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
-                reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype)
+                print('Reprojecting, retiling {}'\
+                      .format(os.path.basename(fileout)))
+                reproject_retile(src, nbands, dst_height, dst_width, fileout, 
+                                 temp_dir, dst_dtype)
         else: 
             temp_mosaic = get_tempfile_name(temp_dir, 'mosaic.tif')
             print('Creating temporary mosaick {}'.format(temp_mosaic))
@@ -573,7 +600,8 @@ def reproject_retile_image(
             
             print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
             with rasterio.open(temp_mosaic, "r") as src:
-                reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype) 
+                reproject_retile(src, nbands, dst_height, dst_width, fileout, 
+                                 temp_dir, dst_dtype) 
             
             if cleanup: 
                 print('Removing temporary mosaick {}'.format(fileout))
@@ -584,6 +612,7 @@ def reproject_retile_image(
         # src_image = src_ima
         print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
         with rasterio.open(src_images, "r") as src:
-            reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, dst_dtype) 
+            reproject_retile(src, nbands, dst_height, dst_width, fileout, 
+                             temp_dir, dst_dtype) 
     
     print('Retiling and reprojecting of {} complete!'.format(fileout))
