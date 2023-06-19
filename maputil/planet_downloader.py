@@ -333,9 +333,10 @@ def get_quad_download_url(url_pt, id):
     return re.sub('<id>', id, url_pt)
 
 
-def get_quad_path(quad_name_pt, quad_dir, qname, id):
+# def get_quad_path(quad_name_pt, quad_dir, qname, id):
+def get_quad_path(quad_name_pt, quad_dir, qname):
     """
-    Replace placeholder with values to get actuall file path
+    Replace placeholder with values to get actual file path
 
     Parameters:
     ----------
@@ -345,17 +346,15 @@ def get_quad_path(quad_name_pt, quad_dir, qname, id):
         Quad directory
     qname: str
         quad name by PlanetScope
-    id: str
-        Quad id
-
+        
     Returns
     -------
     filename: str
-        Actuall file path
+        Actual file path
     """
     filename = re.sub('<quad_dir>', quad_dir, quad_name_pt)
     filename = re.sub('<qname>', qname, filename)
-    filename = re.sub('<id>', id, filename)
+    # filename = re.sub('<id>', id, filename)
     return filename
 
 
