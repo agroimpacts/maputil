@@ -222,9 +222,7 @@ class PlanetDownloader():
         if not os.path.isdir(tile_dir):
             os.makedirs(tile_dir)
 
-        tile_polys = gpd.read_file(tilefile_path).astype(
-            {"tile": "str", "tile_col": "int", "tile_row": "int"}
-        )
+        tile_polys = gpd.read_file(tilefile_path).astype({"tile": "str"})
         if quads_gdf is None:
             if catalog_path:
                 quads_gdf = gpd.read_file(catalog_path)
