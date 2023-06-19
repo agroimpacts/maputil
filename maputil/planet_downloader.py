@@ -149,8 +149,8 @@ class PlanetDownloader():
             for i, row in quads_gdf.iterrows():
                 print(i)
                 link = get_quad_download_url(download_url, row['tile'])
-                filename = get_quad_path(quad_name, quad_dir, row['file'], 
-                                         row['tile'])
+                filename = get_quad_path(quad_name, quad_dir, row['file'])#, 
+                                        #  row['tile'])
                 download_tiles_helper(link, filename)
             return
 
@@ -168,8 +168,8 @@ class PlanetDownloader():
                         if i['id'] not in list(quads_gdf['tile']):
                             continue
                     link = i['_links']['download']
-                    filename = get_quad_path(quad_name, quad_dir, mosaic_name, 
-                                             i['id'])
+                    filename = get_quad_path(quad_name, quad_dir, mosaic_name)#, 
+                                             #i['id'])
                     download_tiles_helper(link, filename)
                 return
 
@@ -346,7 +346,7 @@ def get_quad_path(quad_name_pt, quad_dir, qname):
         Quad directory
     qname: str
         quad name by PlanetScope
-        
+
     Returns
     -------
     filename: str
