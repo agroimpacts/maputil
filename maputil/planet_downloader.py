@@ -266,17 +266,16 @@ class PlanetDownloader():
                     # print(f"{tile_id} skipped")
                     continue
 
-                nicfi_tiles_int = nicfi_tile_polys[
+                nicfi_int = nicfi_tile_polys[
                     nicfi_tile_polys['file'].isin(tiles_int['file'])
                 ]
-                if len(nicfi_tiles_int['file']) > 1:
+                if len(nicfi_int['file']) > 1:
                     image_list = [f'{quad_dir}/{file}' 
-                                  for file in nicfi_tiles_int['file']]
-                elif len(nicfi_tiles_int['file']) == 1: 
-                    image_list = f"{quad_dir}/\
-                        {nicfi_tiles_int['file'].values[0]}"
+                                  for file in nicfi_int['file']]
+                elif len(nicfi_int['file']) == 1: 
+                    image_list = f"{quad_dir}/{nicfi_int['file'].values[0]}"
                 else:
-                    print(f"{i}, empty nicfi_tiles_int['file']")
+                    print(f"{i}, empty nicfi_int['file']")
                     errors.append((tile_id, 'empty'))
                     continue
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
