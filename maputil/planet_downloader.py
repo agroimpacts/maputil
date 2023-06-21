@@ -233,8 +233,9 @@ class PlanetDownloader():
         if log_dir:
             if not os.path.isdir(log_dir):
                 os.mkdir(log_dir)
-            logger = setup_logger(log_dir, "retiler", False)
-            logger.info(f'Initializing log')
+            # setup_logger()
+            setup_logger(log_dir, "retiler", False)
+            logger = logging.getLogger('example')    
             log = True
         else: 
             logger = None

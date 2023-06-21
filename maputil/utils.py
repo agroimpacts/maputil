@@ -114,17 +114,27 @@ def setup_logger(log_dir, log_name, use_date=False):
         log = "{}/{}_{}.log".format(log_dir, log_name, dt)
     else: 
         log = "{}/{}.log".format(log_dir, log_name)
-        
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
-    log_format = (
-        f"%(asctime)s::%(levelname)s::%(name)s::%(filename)s::"
-        f"%(lineno)d::%(message)s"
-    )
-    logging.basicConfig(filename=log, filemode='w',
-                        level=logging.INFO, format=log_format)
+
+    level = logging.INFO
+    logger = logging.getLogger("example")
+    logger.setLevel(level)
+    log_file = log
+    ch = logging.FileHandler(log_file)
+    ch.setLevel(level)
+    logger.addHandler(ch)
+    logger.info("Setup logger in PID {}".format(os.getpid()))
+
+    # for handler in logging.root.handlers[:]:
+    #     logging.root.removeHandler(handler)
+    # log_format = (
+    #     f"%(asctime)s::%(levelname)s::%(name)s::%(filename)s::"
+    #     f"%(lineno)d::%(message)s"
+    # )
+    # logging.basicConfig(filename=log, filemode='w',
+    #                     level=logging.INFO, format=log_format)
     
-    return logging.getLogger()
+    # return logging.getLogger()
+
 
 # def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
 #     """Create logger
