@@ -4,6 +4,7 @@ import pandas as pd
 from smart_open import smart_open
 from datetime import datetime
 import joblib
+from filelock import FileLock
 
 def reads3csv_with_credential(old_url, aws_key, aws_secret):
     parsed = urlparse.urlparse(old_url)
@@ -40,6 +41,48 @@ def progress_reporter(msg, verbose, log, logger=None):
     if log and logger:
         logger.info(msg)
 
+# def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
+#     """Create logger
+
+#     Parameters
+#     ----------
+#     log_dir : str
+#         Path to write log to
+#     log_name : str
+#         What to name the name
+#     num_cores : int
+#         Number of cores, to determine whether parallel logging is set up
+#     use_date : bool
+#         Use today's date and time in file name
+      
+#     Returns:
+#     --------  
+#         Message to console and or log
+#     """
+#     if use_date:
+#         dt = datetime.now().strftime("%d%m%Y_%H%M")
+#         log = "{}/{}_{}.log".format(log_dir, log_name, dt)
+#     else: 
+#         log = "{}/{}.log".format(log_dir, log_name)
+        
+#     for handler in logging.root.handlers[:]:
+#         logging.root.removeHandler(handler)
+#     log_format = (
+#         f"%(asctime)s::%(levelname)s::%(name)s::%(filename)s::"
+#         f"%(lineno)d::%(message)s"
+#     )
+#     logging.basicConfig(filename=log, filemode='w',
+#                         level=logging.INFO, format=log_format)
+    
+#     if num_cores > 2:
+#         logger = logging.getLogger('joblib')
+#         logger.setLevel(logging.INFO)
+#         joblib.logger = logger
+#     else: 
+#         logger = logging.getLogger()
+
+#     return logger
+
 def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
     """Create logger
 
@@ -48,36 +91,56 @@ def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
     log_dir : str
         Path to write log to
     log_name : str
-        What to name the name
+        Name of the log file
     num_cores : int
         Number of cores, to determine whether parallel logging is set up
     use_date : bool
         Use today's date and time in file name
-      
-    Returns:
-    --------  
-        Message to console and or log
+
+    Returns
+    -------
+    logger : logging.Logger
+        Logger object for logging messages
     """
+
+    # Create log file name
     if use_date:
         dt = datetime.now().strftime("%d%m%Y_%H%M")
         log = "{}/{}_{}.log".format(log_dir, log_name, dt)
-    else: 
+    else:
         log = "{}/{}.log".format(log_dir, log_name)
-        
+
+    # Configure log format
+    log_format = (
+        "%(asctime)s::%(levelname)s::%(name)s::%(filename)s::"
+        "%(lineno)d::%(message)s"
+    )
+
+    # Set up a file lock for the log file
+    lock_file = log + ".lock"
+    file_lock = FileLock(lock_file)
+
+    # Clear existing log handlers
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
-    log_format = (
-        f"%(asctime)s::%(levelname)s::%(name)s::%(filename)s::"
-        f"%(lineno)d::%(message)s"
+
+    # Configure log handler
+    file_handler = logging.FileHandler(log, mode='w')
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter(log_format))
+
+    # Apply file lock to log file handler
+    file_handler.addFilter(
+        lambda record: file_lock.acquire() or file_lock.release()
     )
-    logging.basicConfig(filename=log, filemode='w',
-                        level=logging.INFO, format=log_format)
-    
+
+    # Add log handler to logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(file_handler)
+
+    # Configure logger based on number of cores
     if num_cores > 2:
-        logger = logging.getLogger('joblib')
-        logger.setLevel(logging.INFO)
         joblib.logger = logger
-    else: 
-        logger = logging.getLogger()
 
     return logger
