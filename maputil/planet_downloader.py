@@ -182,7 +182,7 @@ class PlanetDownloader():
     def retiler(
         self, tile_dir, quad_dir, temp_dir, tile_file, dates, dst_width, 
         dst_height, nbands, dst_crs, dst_img_pt, num_cores=1, verbose=True, 
-        log=True, quads_gdf=None, catalog_path=None 
+        log_dir=None, quads_gdf=None, catalog_path=None 
     ):
         """
         retile quads from quad_dir into smaller tiles and write tiles to 
@@ -216,8 +216,8 @@ class PlanetDownloader():
             Number of cores used for processing. Defaults to 1 for serial mode
         verbose : bool
             Print messages to console or not
-        log : bool
-            Write messages to logger or not
+        log_dir : str
+            Path to log directory. If provided, logger will be created
         quads_gdf : geopandas
             geopandas of quads
         catalog_path : str
@@ -230,13 +230,15 @@ class PlanetDownloader():
         """
 
         # initialize logger
-        if log:
+        if log_dir:
             if not os.path.isdir(log_dir):
                 os.mkdir(log_dir)
             logger = setup_logger(log_dir, "retiler", False)
             logger.info(f'Initializing log')
+            log = True
         else: 
             logger = None
+            log = False
 
         if not os.path.isdir(tile_dir):
             os.makedirs(tile_dir)
