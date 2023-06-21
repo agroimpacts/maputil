@@ -177,7 +177,7 @@ class PlanetDownloader():
 
     
     def retiler(
-        self, tile_dir, quad_dir, temp_dir, tilefile_path, dates, dst_width, 
+        self, tile_dir, quad_dir, temp_dir, tile_file, dates, dst_width, 
         dst_height, nbands, dst_crs, dst_img_pt, num_cores=1, verbose=True, 
         log=True, logger=None, quads_gdf=None, catalog_path=None
     ):
@@ -193,8 +193,8 @@ class PlanetDownloader():
             Directory storing quads
         temp_dir: str
             Directory to create temporary files
-        tilefile_path: str
-            File path to the tile catalog
+        tile_file: str or GeoDataFrame
+            File path to the tile catalog or geopandas GeoDataFrame of tiles
         dates: list
             List of dates in string format
             Should be in format 'yyyy-dd' or 'yyyy-dd_yyyy-dd' for a time range
@@ -231,7 +231,11 @@ class PlanetDownloader():
         if not os.path.isdir(tile_dir):
             os.makedirs(tile_dir)
 
-        tile_polys = gpd.read_file(tilefile_path).astype({"tile": "str"})
+        if type(tile_file) is str:
+            tile_polys = gpd.read_file(tile_file).astype({"tile": "str"})
+        else: 
+            tile_polys = tile_file.astype({"tile": "str"})
+            
         if quads_gdf is None:
             if catalog_path:
                 quads_gdf = gpd.read_file(catalog_path)
@@ -247,17 +251,6 @@ class PlanetDownloader():
             except KeyError:
                 raise KeyError("Make sure the quads_gdf has 'tile' and\
                                date 'columns'")
-        
-        # create_log = config['create_log']
-        # if create_log:
-        #     if not os.path.isdir(config['log_dir']):
-        #         os.mkdir(config['log_dir'])
-        #     logger = setup_logger(
-        #     config['log_dir'], f'{config["region"]}_{config["sentinel"]}', 
-        #     use_date=True
-        #     )
-        # else: 
-        # logger = None
         
         errors = []
         for date in dates:
@@ -525,9 +518,10 @@ def dst_transform(poly, res = 0.005 / 200):
 
 
 def reproject_retile_image(
-    src_images, dst_transform, dst_width, dst_height, nbands, dst_crs,
-    fileout, temp_dir, dst_dtype=np.int16, inmemory=True, cleanup=True, 
-    verbose=True, log=False, logger=None):
+        src_images, dst_transform, dst_width, dst_height, nbands, dst_crs,
+        fileout, temp_dir, dst_dtype=np.int16, inmemory=True, cleanup=True, 
+        verbose=True, log=False, logger=None
+    ):
     """Takes an input images or list of images and merges (if several) and 
     reprojects and retiles it to align to the resolution and extent defined by
     an polygon and associated transform
