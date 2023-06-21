@@ -345,7 +345,8 @@ class PlanetDownloader():
                                   verbose, log, logger)
                 results = Parallel(n_jobs=num_cores)(
                     delayed(process_tile)(
-                        i, log_queue=q, log_level=logger.getEffectiveLevel()
+                        i, log_queue=log_queue, 
+                        log_level=logger.getEffectiveLevel()
                     ) for i in range(len(tile_polys_prj))
                 )
             else:
