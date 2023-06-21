@@ -41,69 +41,9 @@ def progress_reporter(msg, verbose, log, logger=None):
     if log and logger:
         logger.info(msg)
 
-# def configure_root_logger():
-#     root = logging.getLogger()
-#     console_handler = logging.StreamHandler()
-#     formatter = logging.Formatter('%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s')
-#     console_handler.setFormatter(formatter)
-#     root.addHandler(console_handler)
-#     root.setLevel(logging.DEBUG)
-#     return root
-
-def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
-    """Create root logger, adapting from here: 
-    https://github.com/joblib/joblib/issues/1017#issuecomment-1535983689
-
-    Parameters
-    ----------
-    log_dir : str
-        Path to write log to
-    log_name : str
-        What to name the name
-    num_cores : int
-        Number of cores, to determine whether parallel logging is set up
-    use_date : bool
-        Use today's date and time in file name
-      
-    Returns:
-    --------  
-        Message to console and or log
-    """
-    if use_date:
-        dt = datetime.now().strftime("%d%m%Y_%H%M")
-        log = "{}/{}_{}.log".format(log_dir, log_name, dt)
-    else: 
-        log = "{}/{}.log".format(log_dir, log_name)
-
-    logger = logging.getLogger()
-    console_handler = logging.StreamHandler()    
-    logging.basicConfig(filename=log, filemode='w')
-
-    log_format = (
-        f"%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s"
-    )
-    formatter = logging.Formatter()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-    logger.setLevel(logging.INFO)
-
-    return logger
-
-def configure_worker_logger(log_queue, log_level):
-    """Create worker logger for parallel jobs, following:
-    https://github.com/joblib/joblib/issues/1017#issuecomment-1535983689
-
-    """
-    worker_logger = logging.getLogger('worker')
-    if not worker_logger.hasHandlers():
-        h = QueueHandler(log_queue)
-        worker_logger.addHandler(h)
-    worker_logger.setLevel(log_level)
-
-    return worker_logger
-
 # def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
-#     """Create root logger
+#     """Create root logger, adapting from here: 
+#     https://github.com/joblib/joblib/issues/1017#issuecomment-1535983689
 
 #     Parameters
 #     ----------
@@ -125,24 +65,66 @@ def configure_worker_logger(log_queue, log_level):
 #         log = "{}/{}_{}.log".format(log_dir, log_name, dt)
 #     else: 
 #         log = "{}/{}.log".format(log_dir, log_name)
-        
-#     for handler in logging.root.handlers[:]:
-#         logging.root.removeHandler(handler)
+
+#     logger = logging.getLogger()
+#     console_handler = logging.StreamHandler()    
+#     logging.basicConfig(filename=log, filemode='w')
+
 #     log_format = (
-#         f"%(asctime)s::%(levelname)s::%(name)s::%(filename)s::"
-#         f"%(lineno)d::%(message)s"
+#         f"%(asctime)s %(processName)-10s %(name)s %(levelname)-8s %(message)s"
 #     )
-#     logging.basicConfig(filename=log, filemode='w',
-#                         level=logging.INFO, format=log_format)
-    
-#     if num_cores > 2:
-#         logger = logging.getLogger('joblib')
-#         logger.setLevel(logging.INFO)
-#         joblib.logger = logger
-#     else: 
-#         logger = logging.getLogger()
+#     formatter = logging.Formatter()
+#     console_handler.setFormatter(formatter)
+#     logger.addHandler(console_handler)
+#     logger.setLevel(logging.INFO)
 
 #     return logger
+
+# def configure_worker_logger(log_queue, log_level):
+#     """Create worker logger for parallel jobs, following:
+#     https://github.com/joblib/joblib/issues/1017#issuecomment-1535983689
+
+#     """
+#     worker_logger = logging.getLogger('worker')
+#     if not worker_logger.hasHandlers():
+#         h = QueueHandler(log_queue)
+#         worker_logger.addHandler(h)
+#     worker_logger.setLevel(log_level)
+
+#     return worker_logger
+
+def setup_logger(log_dir, log_name, use_date=False):
+    """Create logger
+
+    Parameters
+    ----------
+    log_dir : str
+        Path to write log to
+    log_name : str
+        What to name the name
+    use_date : bool
+        Use today's date and time in file name
+      
+    Returns:
+    --------  
+        Message to console and or log
+    """
+    if use_date:
+        dt = datetime.now().strftime("%d%m%Y_%H%M")
+        log = "{}/{}_{}.log".format(log_dir, log_name, dt)
+    else: 
+        log = "{}/{}.log".format(log_dir, log_name)
+        
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    log_format = (
+        f"%(asctime)s::%(levelname)s::%(name)s::%(filename)s::"
+        f"%(lineno)d::%(message)s"
+    )
+    logging.basicConfig(filename=log, filemode='w',
+                        level=logging.INFO, format=log_format)
+    
+    return logging.getLogger()
 
 # def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
 #     """Create logger
