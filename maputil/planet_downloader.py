@@ -344,7 +344,9 @@ class PlanetDownloader():
                 progress_reporter(f'Processing job with {num_cores} cores', 
                                   verbose, log, logger)
                 results = Parallel(n_jobs=num_cores)(
-                    delayed(process_tile)(i) for i in range(len(tile_polys_prj))
+                    delayed(process_tile)(
+                        i, log_queue=q, log_level=logger.getEffectiveLevel()
+                    ) for i in range(len(tile_polys_prj))
                 )
             else:
                 progress_reporter("Processing serial", verbose, log, logger)
