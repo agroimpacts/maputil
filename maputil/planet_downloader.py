@@ -3,6 +3,7 @@ import os
 import re
 import requests
 import urllib
+from joblib import Parallel, delayed
 from subprocess import run
 import time
 import numpy as np
@@ -18,6 +19,7 @@ from rasterio import fill
 from rasterio.plot import show
 from rasterio.io import MemoryFile
 from rasterio.warp import reproject, Resampling
+from .utils import *
 
 
 class PlanetDownloader():
@@ -175,9 +177,9 @@ class PlanetDownloader():
 
     
     def retiler(
-        self, tile_dir, quad_dir, temp_dir, tilefile_path, 
-        dates, dst_width, dst_height, nbands, dst_crs, dst_img_pt, 
-        quads_gdf=None, catalog_path=None
+        self, tile_dir, quad_dir, temp_dir, tilefile_path, dates, dst_width, 
+        dst_height, nbands, dst_crs, dst_img_pt, num_cores=1, verbose=True, 
+        log=True, logger=None, quads_gdf=None, catalog_path=None
     ):
         """
         retile quads from quad_dir into smaller tiles and write tiles to 
@@ -207,12 +209,19 @@ class PlanetDownloader():
             Code for output CRS, e.g "EPSG:4326"
         dst_img_pt : str
             Output file path and name pattern for output geotiff
-        quads_gdf: geopandas
+        num_cores : int
+            Number of cores used for processing. Defaults to 1 for serial mode
+        verbose : bool
+            Print messages to console or not
+        log : bool
+            Write messages to logger or not
+        logger : logging.logger
+            Logger object
+        quads_gdf : geopandas
             geopandas of quads
-        catalog_path: str
+        catalog_path : str
             File path to the quad catalog
 
-        
         Returns
         -------
         errors: list
@@ -239,14 +248,27 @@ class PlanetDownloader():
                 raise KeyError("Make sure the quads_gdf has 'tile' and\
                                date 'columns'")
         
+        # create_log = config['create_log']
+        # if create_log:
+        #     if not os.path.isdir(config['log_dir']):
+        #         os.mkdir(config['log_dir'])
+        #     logger = setup_logger(
+        #     config['log_dir'], f'{config["region"]}_{config["sentinel"]}', 
+        #     use_date=True
+        #     )
+        # else: 
+        # logger = None
+        
         errors = []
         for date in dates:
-            print(f"Date: {date}")
+            progress_reporter(f"Processing for date: {date}", verbose, log, 
+                              logger)
             nicfi_tile_polys = quads_gdf[quads_gdf['date'] == date]
-            tile_polys_merc = tile_polys.to_crs(nicfi_tile_polys.crs)
+            tile_polys_prj = tile_polys.to_crs(nicfi_tile_polys.crs)
 
-            for i in range(len(tile_polys_merc)):
-                tile = tile_polys_merc.iloc[[int(i)]]
+            # function to enable parallel processing
+            def process_tile(i):
+                tile = tile_polys_prj.iloc[[int(i)]]
                 tiles_int = sjoin(tile, nicfi_tile_polys, how='left')
 
                 # Name output file paths
@@ -283,14 +305,16 @@ class PlanetDownloader():
                 transform = dst_transform(poly)
 
                 # Retile
-                print(f'Reprojecting and retiling {dst_img}')
+                progress_reporter(f"Processing tile {dst_img}", 
+                                  verbose, log, logger)
                 try:
                     reproject_retile_image(
                         image_list, transform, dst_width, dst_height, nbands, 
-                        dst_crs, dst_img, temp_dir, inmemory=False
+                        dst_crs, dst_img, temp_dir, inmemory=False, 
+                        verbose=verbose, log=log, logger=logger
                     )
                 except Exception as e:
-                    print(repr(e))
+                    progress_reporter(repr(e), verbose, log, logger)
                     errors.append(repr(e))
 
                 # cogification
@@ -298,20 +322,33 @@ class PlanetDownloader():
                        dst_cog]
                 p = run(cmd, capture_output=True)
                 msg = p.stderr.decode().split('\n')
-                print(f'...{msg[-2]}')
+                # print(f'...{msg[-2]}')
+                progress_reporter(f'...{msg[-2]}', verbose, log, logger)
 
                 cmd = ['rio', 'cogeo', 'validate', dst_cog]
                 p = run(cmd, capture_output = True)
                 msg = p.stdout.decode().split('\n')
-                print(f'...{msg[0]}')
+                # print(f'...{msg[0]}')
+                progress_reporter(f'...{msg[0]}', verbose, log, logger)
 
                 if os.path.exists(f"{dst_cog}"):
                     if os.path.exists(f"{dst_img}"):
                         os.remove(dst_img)
 
-        print("All processed")
-        return errors
+            # Parallelize the loop using joblib
+            if num_cores > 1:
+                results = Parallel(n_jobs=num_cores)(
+                    delayed(process_tile)(i) for i in range(len(tile_polys_prj))
+                )
+            else: 
+                results = [process_tile(i) for i in range(len(tile_polys_prj))]
 
+            progress_reporter(f"Completed processing tiles for {date}", 
+                              verbose, log, logger)   
+             
+        progress_reporter("All processed", verbose, log, logger)   
+        
+        return errors
 
 
 def get_quad_download_url(url_pt, id):
@@ -489,7 +526,8 @@ def dst_transform(poly, res = 0.005 / 200):
 
 def reproject_retile_image(
     src_images, dst_transform, dst_width, dst_height, nbands, dst_crs,
-    fileout, temp_dir, dst_dtype=np.int16, inmemory=True, cleanup=True):
+    fileout, temp_dir, dst_dtype=np.int16, inmemory=True, cleanup=True, 
+    verbose=True, log=False, logger=None):
     """Takes an input images or list of images and merges (if several) and 
     reprojects and retiles it to align to the resolution and extent defined by
     an polygon and associated transform
@@ -521,15 +559,20 @@ def reproject_retile_image(
         upon completion
     cleanup : bool
         Whether to remove temporary mosaic (if made) or not
+    verbose : bool
+        Print messages to console or not
+    log : bool
+        Write messages to logger or not
+    logger : logging.logger
+        Logger object
     
     Returns
     -------
     geotiff of retiled image writen to disk 
     """
     
-    
     def reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, 
-                         dst_dtype): 
+                         dst_dtype, ): 
         src_kwargs = src.meta.copy()  # get metadata
         kwargs = src_kwargs
         kwargs.update({
@@ -555,7 +598,8 @@ def reproject_retile_image(
             
     # mosaic if list
     if type(src_images) is list:
-        print('Mosaicking {} images'.format(len(src_images)))
+        progress_reporter(f"..mosaicking {len(src_images)} images", 
+                          verbose, log, logger)
         
         images_to_mosaic = []
         for idx, image in enumerate(src_images):
@@ -563,7 +607,8 @@ def reproject_retile_image(
               src = rasterio.open(image)
               images_to_mosaic.append(src)
             except:
-              print(f'File not found: {image}')
+              progress_reporter(f'..file not found: {image}', verbose, log, 
+                                logger)
               continue
               # raise Exception('RasterioIOError: File not found')
 
@@ -578,37 +623,43 @@ def reproject_retile_image(
         })
         
         if inmemory:
-            print('Mosaicking in memory')
+            progress_reporter('....mosaicking in memory', verbose, log, 
+                              logger)
             with MemoryFile() as memfile:
                 with memfile.open(**out_meta) as dst:
                     dst.write(mosaic)
 
-                print('Reprojecting, retiling {}'\
-                      .format(os.path.basename(fileout)))
+                msg = f"..reprojecting, retiling {os.path.basename(fileout)}"
+                progress_reporter(msg, verbose, log, logger)
                 reproject_retile(src, nbands, dst_height, dst_width, fileout, 
                                  temp_dir, dst_dtype)
         else: 
             temp_mosaic = get_tempfile_name(temp_dir, 'mosaic.tif')
-            print('Creating temporary mosaick {}'.format(temp_mosaic))
-
+            msg = f"....creating temporary mosaick {temp_mosaic}"
+            progress_reporter(msg, verbose, log, logger)
             with rasterio.open(temp_mosaic, "w", **out_meta) as dst:
                   dst.write(mosaic)
             
-            print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
+            msg = f"..reprojecting, retiling {os.path.basename(fileout)}"
+            progress_reporter(msg, verbose, log, logger)
             with rasterio.open(temp_mosaic, "r") as src:
                 reproject_retile(src, nbands, dst_height, dst_width, fileout, 
                                  temp_dir, dst_dtype) 
             
             if cleanup: 
-                print('Removing temporary mosaick {}'.format(fileout))
+                progress_reporter(f"....removing temporary mosaick {fileout}", 
+                                  verbose, log, logger)
                 os.remove(temp_mosaic)
             
     else: 
-        print('Retiling from single image')
-        # src_image = src_ima
-        print('Reprojecting, retiling {}'.format(os.path.basename(fileout)))
+        progress_reporter("..retiling from single image", verbose, log, logger)
+        msg = f"..reprojecting, retiling {os.path.basename(fileout)}"
+        progress_reporter(msg, verbose, log, logger)
         with rasterio.open(src_images, "r") as src:
             reproject_retile(src, nbands, dst_height, dst_width, fileout, 
                              temp_dir, dst_dtype) 
     
-    print('Retiling and reprojecting of {} complete!'.format(fileout))
+    msg = f"Retiling and reprojecting of {fileout} complete!")
+    progress_reporter(msg, verbose, log, logger)
+
+
