@@ -273,13 +273,14 @@ class PlanetDownloader():
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
 
                 # Check if files already exist
-                if os.path.exists(f"{dst_img}") and \
-                    os.path.exists(f"{dst_cog}"):
+                if os.path.exists(dst_img) and os.path.exists(dst_cog):
                     os.remove(dst_img)
-                    continue
-                if os.path.exists(f"{dst_cog}"):
-                    # print(f"{tile_id} skipped")
-                    continue
+                    return
+
+                if os.path.exists(dst_cog):
+                    progress_reporter(f"...{tile_id} exists, skipped", verbose, 
+                                      log, logger)
+                    return
 
                 nicfi_int = nicfi_tile_polys[
                     nicfi_tile_polys['file'].isin(tiles_int['file'])
@@ -290,9 +291,11 @@ class PlanetDownloader():
                 elif len(nicfi_int['file']) == 1: 
                     image_list = f"{quad_dir}/{nicfi_int['file'].values[0]}"
                 else:
-                    print(f"{i}, empty nicfi_int['file']")
+                    progress_reporter(f"{i}, empty nicfi_int['file']", verbose,
+                                      log, logger)
                     errors.append((tile_id, 'empty'))
-                    continue
+                    return
+
                 dst_cog = re.sub('.tif', '_cog.tif', dst_img)
                 poly = tile_polys[tile_polys['tile'].isin(tile['tile'])]
                 transform = dst_transform(poly)
@@ -321,7 +324,6 @@ class PlanetDownloader():
                 cmd = ['rio', 'cogeo', 'validate', dst_cog]
                 p = run(cmd, capture_output = True)
                 msg = p.stdout.decode().split('\n')
-                # print(f'...{msg[0]}')
                 progress_reporter(f'...{msg[0]}', verbose, log, logger)
 
                 if os.path.exists(f"{dst_cog}"):
@@ -330,10 +332,13 @@ class PlanetDownloader():
 
             # Parallelize the loop using joblib
             if num_cores > 1:
+                progress_reporter(f'Processing job with {num_cores} cores', 
+                                  verbose, log, logger)
                 results = Parallel(n_jobs=num_cores)(
                     delayed(process_tile)(i) for i in range(len(tile_polys_prj))
                 )
-            else: 
+            else:
+                progress_reporter("Processing serial", verbose, log, logger)
                 results = [process_tile(i) for i in range(len(tile_polys_prj))]
 
             progress_reporter(f"Completed processing tiles for {date}", 
@@ -653,7 +658,7 @@ def reproject_retile_image(
             reproject_retile(src, nbands, dst_height, dst_width, fileout, 
                              temp_dir, dst_dtype) 
     
-    msg = f"Retiling and reprojecting of {fileout} complete!")
+    msg = f"Retiling and reprojecting of {fileout} complete!"
     progress_reporter(msg, verbose, log, logger)
 
 

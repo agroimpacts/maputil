@@ -2,6 +2,8 @@ import urllib.parse as urlparse
 import logging
 import pandas as pd
 from smart_open import smart_open
+from datetime import datetime
+import joblib
 
 def reads3csv_with_credential(old_url, aws_key, aws_secret):
     parsed = urlparse.urlparse(old_url)
@@ -38,7 +40,7 @@ def progress_reporter(msg, verbose, log, logger=None):
     if log and logger:
         logger.info(msg)
 
-def setup_logger(log_dir, log_name, use_date=False):
+def setup_logger(log_dir, log_name, num_cores=1, use_date=False):
     """Create logger
 
     Parameters
@@ -47,6 +49,8 @@ def setup_logger(log_dir, log_name, use_date=False):
         Path to write log to
     log_name : str
         What to name the name
+    num_cores : int
+        Number of cores, to determine whether parallel logging is set up
     use_date : bool
         Use today's date and time in file name
       
@@ -69,4 +73,11 @@ def setup_logger(log_dir, log_name, use_date=False):
     logging.basicConfig(filename=log, filemode='w',
                         level=logging.INFO, format=log_format)
     
-    return logging.getLogger()
+    if num_cores > 2:
+        logger = logging.getLogger('joblib')
+        logger.setLevel(logging.INFO)
+        joblib.logger = logger
+    else: 
+        logger = logging.getLogger()
+
+    return logger
