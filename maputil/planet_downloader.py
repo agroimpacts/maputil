@@ -182,8 +182,7 @@ class PlanetDownloader():
     def retiler(
         self, tile_dir, quad_dir, temp_dir, tile_file, dates, dst_width, 
         dst_height, nbands, dst_crs, dst_img_pt, num_cores=1, verbose=True, 
-        log=True, logger=None, quads_gdf=None, catalog_path=None, 
-        log_queue=None, log_level=None
+        log=True, quads_gdf=None, catalog_path=None 
     ):
         """
         retile quads from quad_dir into smaller tiles and write tiles to 
@@ -219,22 +218,25 @@ class PlanetDownloader():
             Print messages to console or not
         log : bool
             Write messages to logger or not
-        logger : logging.logger
-            Logger object
         quads_gdf : geopandas
             geopandas of quads
         catalog_path : str
             File path to the quad catalog
-        log_queue : multiprocessing.Manager.Queue()
-            For logging in parallel
-        log_level : logging.logger.getEffectiveLevel()
-            For logging in parallel
 
         Returns
         -------
         errors: list
             A list of error
         """
+
+        # initialize logger
+        if log:
+            if not os.path.isdir(log_dir):
+                os.mkdir(log_dir)
+            logger = setup_logger(log_dir, "retiler", False)
+            logger.info(f'Initializing log')
+        else: 
+            logger = None
 
         if not os.path.isdir(tile_dir):
             os.makedirs(tile_dir)
@@ -269,7 +271,7 @@ class PlanetDownloader():
 
             # function to enable parallel processing
             def process_tile(i):
-                worker_logger = configure_worker_logger(log_queue, log_level)                
+
                 tile = tile_polys_prj.iloc[[int(i)]]
                 tiles_int = sjoin(tile, nicfi_tile_polys, how='left')
 
@@ -288,7 +290,7 @@ class PlanetDownloader():
 
                 if os.path.exists(dst_cog):
                     progress_reporter(f"...{tile_id} exists, skipped", verbose, 
-                                      log, worker_logger)
+                                      log, logger)
                     return
 
                 nicfi_int = nicfi_tile_polys[
@@ -301,7 +303,7 @@ class PlanetDownloader():
                     image_list = f"{quad_dir}/{nicfi_int['file'].values[0]}"
                 else:
                     progress_reporter(f"{i}, empty nicfi_int['file']", verbose,
-                                      log, worker_logger)
+                                      log, logger)
                     errors.append((tile_id, 'empty'))
                     return
 
@@ -311,7 +313,7 @@ class PlanetDownloader():
 
                 # Retile
                 progress_reporter(f"Processing tile {dst_img}", 
-                                  verbose, log, worker_logger)
+                                  verbose, log, logger)
                 try:
                     reproject_retile_image(
                         image_list, transform, dst_width, dst_height, nbands, 
@@ -319,7 +321,7 @@ class PlanetDownloader():
                         verbose=verbose, log=log, logger=logger
                     )
                 except Exception as e:
-                    progress_reporter(repr(e), verbose, log, worker_logger)
+                    progress_reporter(repr(e), verbose, log, logger)
                     errors.append(repr(e))
 
                 # cogification
@@ -328,12 +330,12 @@ class PlanetDownloader():
                 p = run(cmd, capture_output=True)
                 msg = p.stderr.decode().split('\n')
                 # print(f'...{msg[-2]}')
-                progress_reporter(f'...{msg[-2]}', verbose, log, worker_logger)
+                progress_reporter(f'...{msg[-2]}', verbose, log, logger)
 
                 cmd = ['rio', 'cogeo', 'validate', dst_cog]
                 p = run(cmd, capture_output = True)
                 msg = p.stdout.decode().split('\n')
-                progress_reporter(f'...{msg[0]}', verbose, log, worker_logger)
+                progress_reporter(f'...{msg[0]}', verbose, log, logger)
 
                 if os.path.exists(f"{dst_cog}"):
                     if os.path.exists(f"{dst_img}"):
@@ -344,10 +346,7 @@ class PlanetDownloader():
                 progress_reporter(f'Processing job with {num_cores} cores', 
                                   verbose, log, logger)
                 results = Parallel(n_jobs=num_cores)(
-                    delayed(process_tile)(
-                        i, log_queue=log_queue, 
-                        log_level=logger.getEffectiveLevel()
-                    ) for i in range(len(tile_polys_prj))
+                    delayed(process_tile)(i) for i in range(len(tile_polys_prj))
                 )
             else:
                 progress_reporter("Processing serial", verbose, log, logger)
