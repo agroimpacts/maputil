@@ -5,8 +5,9 @@ import requests
 import urllib
 from joblib import Parallel, delayed
 import logging
-from logging.handlers import QueueHandler, QueueListener
-from multiprocessing import Manager
+# from logging.handlers import QueueHandler, QueueListener
+# from multiprocessing import Manager
+from multiprocessing import Pool
 from subprocess import run
 import time
 import numpy as np
@@ -177,12 +178,13 @@ class PlanetDownloader():
                                              #i['id'])
                     download_tiles_helper(link, filename)
                 return
-
+            # function to enable parallel processing
+            
     
     def retiler(
         self, tile_dir, quad_dir, temp_dir, tile_file, dates, dst_width, 
         dst_height, nbands, dst_crs, dst_img_pt, num_cores=1, verbose=True, 
-        log_dir=None, quads_gdf=None, catalog_path=None 
+        log=False, quads_gdf=None, catalog_path=None 
     ):
         """
         retile quads from quad_dir into smaller tiles and write tiles to 
@@ -216,8 +218,8 @@ class PlanetDownloader():
             Number of cores used for processing. Defaults to 1 for serial mode
         verbose : bool
             Print messages to console or not
-        log_dir : str
-            Path to log directory. If provided, logger will be created
+        log : boolstr
+            Whether to log or not
         quads_gdf : geopandas
             geopandas of quads
         catalog_path : str
@@ -228,26 +230,19 @@ class PlanetDownloader():
         errors: list
             A list of error
         """
-
-        # initialize logger
-        if log_dir:
-            if not os.path.isdir(log_dir):
-                os.mkdir(log_dir)
-            # setup_logger()
-            setup_logger(log_dir, "retiler", False)
-            logger = logging.getLogger('example')    
-            log = True
-        else: 
+        
+        if log:
+            logger = logging.getLogger("maputils")
+        else:
             logger = None
-            log = False
 
         if not os.path.isdir(tile_dir):
             os.makedirs(tile_dir)
 
         if type(tile_file) is str:
-            tile_polys = gpd.read_file(tile_file).astype({"tile": "str"})
+            tiles = gpd.read_file(tile_file).astype({"tile": "str"})
         else: 
-            tile_polys = tile_file.astype({"tile": "str"})
+            tiles = tile_file.astype({"tile": "str"})
 
         if quads_gdf is None:
             if catalog_path:
@@ -265,102 +260,52 @@ class PlanetDownloader():
                 raise KeyError("Make sure the quads_gdf has 'tile' and\
                                date 'columns'")
         
-        errors = []
+        # errors = []
         for date in dates:
             progress_reporter(f"Processing for date: {date}", verbose, log, 
                               logger)
-            nicfi_tile_polys = quads_gdf[quads_gdf['date'] == date]
-            tile_polys_prj = tile_polys.to_crs(nicfi_tile_polys.crs)
+            quads = quads_gdf[quads_gdf['date'] == date]
+            # tiles_prj = tiles.to_crs(quads.crs)
 
-            # function to enable parallel processing
-            def process_tile(i):
+            tile_meta = {
+                "tile_dir": tile_dir,
+                "quad_dir": quad_dir,
+                "temp_dir": temp_dir,
+                "dst_img_pt": dst_img_pt,
+                "date": date,
+                "log": log,
+                "verbose": verbose,
+                "dst_width": dst_width, 
+                "dst_height": dst_height, 
+                "dst_crs": f"EPSG:{tiles.crs.to_epsg()}",
+                "nbands": nbands
+            }
 
-                tile = tile_polys_prj.iloc[[int(i)]]
-                tiles_int = sjoin(tile, nicfi_tile_polys, how='left')
-
-                # Name output file paths
-                tile_id = int(float(tile['tile'].values.flatten()[0]))
-                tile_id_str = f"{tile_id}"
-                dst_img = re.sub('<tile_dir>', tile_dir, dst_img_pt)
-                dst_img = re.sub('<tile_id>', tile_id_str, dst_img)
-                dst_img = re.sub('<date>', date, dst_img)
-                dst_cog = re.sub('.tif', '_cog.tif', dst_img)
-
-                # Check if files already exist
-                if os.path.exists(dst_img) and os.path.exists(dst_cog):
-                    os.remove(dst_img)
-                    return
-
-                if os.path.exists(dst_cog):
-                    progress_reporter(f"...{tile_id} exists, skipped", verbose, 
-                                      log, logger)
-                    return
-
-                nicfi_int = nicfi_tile_polys[
-                    nicfi_tile_polys['file'].isin(tiles_int['file'])
-                ]
-                if len(nicfi_int['file']) > 1:
-                    image_list = [f'{quad_dir}/{file}' 
-                                  for file in nicfi_int['file']]
-                elif len(nicfi_int['file']) == 1: 
-                    image_list = f"{quad_dir}/{nicfi_int['file'].values[0]}"
-                else:
-                    progress_reporter(f"{i}, empty nicfi_int['file']", verbose,
-                                      log, logger)
-                    errors.append((tile_id, 'empty'))
-                    return
-
-                dst_cog = re.sub('.tif', '_cog.tif', dst_img)
-                poly = tile_polys[tile_polys['tile'].isin(tile['tile'])]
-                transform = dst_transform(poly)
-
-                # Retile
-                progress_reporter(f"Processing tile {dst_img}", 
-                                  verbose, log, logger)
-                try:
-                    reproject_retile_image(
-                        image_list, transform, dst_width, dst_height, nbands, 
-                        dst_crs, dst_img, temp_dir, inmemory=False, 
-                        verbose=verbose, log=log, logger=logger
-                    )
-                except Exception as e:
-                    progress_reporter(repr(e), verbose, log, logger)
-                    errors.append(repr(e))
-
-                # cogification
-                cmd = ['rio', 'cogeo', 'create', '-b', '1,2,3,4', dst_img, 
-                       dst_cog]
-                p = run(cmd, capture_output=True)
-                msg = p.stderr.decode().split('\n')
-                # print(f'...{msg[-2]}')
-                progress_reporter(f'...{msg[-2]}', verbose, log, logger)
-
-                cmd = ['rio', 'cogeo', 'validate', dst_cog]
-                p = run(cmd, capture_output = True)
-                msg = p.stdout.decode().split('\n')
-                progress_reporter(f'...{msg[0]}', verbose, log, logger)
-
-                if os.path.exists(f"{dst_cog}"):
-                    if os.path.exists(f"{dst_img}"):
-                        os.remove(dst_img)
-
-            # Parallelize the loop using joblib
+            # Parallelize 
             if num_cores > 1:
                 progress_reporter(f'Processing job with {num_cores} cores', 
                                   verbose, log, logger)
-                results = Parallel(n_jobs=num_cores)(
-                    delayed(process_tile)(i) for i in range(len(tile_polys_prj))
-                )
-            else:
+                # results = Parallel(n_jobs=num_cores)(
+                #     delayed(process_tile)(i) for i in range(len(tile_polys_prj))
+                # )
+                with Pool(num_cores) as p:
+                    items = [(i, tiles, quads, tile_meta) 
+                             for i in range(len(tiles))]
+                    results = []
+                    for result in p.starmap(process_tile, items):
+                        results.append(result)
+
+            else:  # serial
                 progress_reporter("Processing serial", verbose, log, logger)
-                results = [process_tile(i) for i in range(len(tile_polys_prj))]
+                results = [process_tile(i, tiles, quads, tile_meta) 
+                           for i in range(len(tiles))]
 
             progress_reporter(f"Completed processing tiles for {date}", 
                               verbose, log, logger)   
              
         progress_reporter("All processed", verbose, log, logger)   
         
-        return errors
+        # return errors
 
 
 def get_quad_download_url(url_pt, id):
@@ -539,7 +484,7 @@ def dst_transform(poly, res = 0.005 / 200):
 def reproject_retile_image(
         src_images, dst_transform, dst_width, dst_height, nbands, dst_crs,
         fileout, temp_dir, dst_dtype=np.int16, inmemory=True, cleanup=True, 
-        verbose=True, log=False, logger=None
+        verbose=True, log=False
     ):
     """Takes an input images or list of images and merges (if several) and 
     reprojects and retiles it to align to the resolution and extent defined by
@@ -576,8 +521,6 @@ def reproject_retile_image(
         Print messages to console or not
     log : bool
         Write messages to logger or not
-    logger : logging.logger
-        Logger object
     
     Returns
     -------
@@ -585,7 +528,7 @@ def reproject_retile_image(
     """
     
     def reproject_retile(src, nbands, dst_height, dst_width, fileout, temp_dir, 
-                         dst_dtype, ): 
+                         dst_dtype): 
         src_kwargs = src.meta.copy()  # get metadata
         kwargs = src_kwargs
         kwargs.update({
@@ -608,7 +551,14 @@ def reproject_retile_image(
             )[0]
         with rasterio.open(fileout, "w", **kwargs) as dst:
             dst.write(np.rint(dst_canvas).astype(dst_dtype))
-            
+    
+    # initialize logger
+    if log:
+        logger = logging.getLogger("maputils")
+    else:
+        logger = None
+
+    
     # mosaic if list
     if type(src_images) is list:
         progress_reporter(f"..mosaicking {len(src_images)} images", 
@@ -617,13 +567,13 @@ def reproject_retile_image(
         images_to_mosaic = []
         for idx, image in enumerate(src_images):
             try:
-              src = rasterio.open(image)
-              images_to_mosaic.append(src)
+                src = rasterio.open(image)
+                images_to_mosaic.append(src)
             except:
-              progress_reporter(f'..file not found: {image}', verbose, log, 
-                                logger)
-              continue
-              # raise Exception('RasterioIOError: File not found')
+                progress_reporter(f'..file not found: {image}', verbose, log, 
+                                  logger)
+                continue
+                # raise Exception('RasterioIOError: File not found')
 
         # perform mosaic
         mosaic, out_trans = merge(images_to_mosaic)
@@ -676,3 +626,101 @@ def reproject_retile_image(
     progress_reporter(msg, verbose, log, logger)
 
 
+
+def process_tile(i, tiles, quads_gdf, tile_meta):
+    """
+    Process a single tile in retiler within a loop or parallel process
+    
+    Arguments
+    ---------
+    i : int
+        Iterator index
+    tiles : GeoDataFrame
+        The tile polygons
+    quads_df : GeoDataFrame
+        The quad polygons
+    tile_meta : dict
+        Dictionary holding the variables tile_dir, quad_dir, dst_img_pt,
+        date, log, verbose, dst_width, dst_height, dst_crs, nbands
+    """
+    
+    verbose = tile_meta['verbose']
+    log = tile_meta['log']
+    if log:
+        logger = logging.getLogger("maputils")
+    else:
+        logger = None
+    
+    # tile
+    tile = tiles.iloc[[int(i)]]
+
+    # Reproject selected tile to quads.crs and join
+    tiles_int = sjoin(tile.to_crs(quads_gdf.crs), quads_gdf, how='left')
+
+    # Name output file paths
+    tile_id = int(float(tile['tile'].values.flatten()[0]))
+    tile_id_str = f"{tile_id}"
+    dst_img = re.sub('<tile_dir>', tile_meta['tile_dir'], 
+                     tile_meta['dst_img_pt'])
+    dst_img = re.sub('<tile_id>', tile_id_str, dst_img)
+    dst_img = re.sub('<date>', tile_meta['date'], dst_img)
+    dst_cog = re.sub('.tif', '_cog.tif', dst_img)
+
+    # Check if files already exist
+    if os.path.exists(dst_img) and os.path.exists(dst_cog):
+        os.remove(dst_img)
+        return
+
+    if os.path.exists(dst_cog):
+        progress_reporter(f"...{tile_id} exists, skipped", verbose, 
+                          log, logger)
+        return
+
+    quads_int = quads_gdf[
+        quads_gdf['file'].isin(tiles_int['file'])
+    ]
+    if len(quads_int['file']) > 1:
+        image_list = [f"{tile_meta['quad_dir']}/{file}" 
+                      for file in quads_int['file']]
+    elif len(quads_int['file']) == 1: 
+        image_list = f"{tile_meta['quad_dir']}/{quads_int['file'].values[0]}"
+    else:
+        progress_reporter(f"{i}, empty quads_int['file']", verbose,
+                          log, logger)
+        # errors.append((tile_id, 'empty'))
+        return
+
+    # get transform from unprojected tiles    
+    # poly = tiles[tiles['tile'].isin(tile['tile'])]
+    # transform = dst_transform(poly)
+    transform = dst_transform(tile)
+
+    # Retile
+    progress_reporter(f"Processing tile {dst_img}", 
+                      verbose, log, logger)
+    try:
+        reproject_retile_image(
+            image_list, transform, tile_meta['dst_width'], 
+            tile_meta['dst_height'], tile_meta['nbands'], 
+            tile_meta['dst_crs'], dst_img, tile_meta['temp_dir'], 
+            inmemory=False, verbose=verbose, log=log
+        )
+    except Exception as e:
+        progress_reporter(repr(e), verbose, log, logger)
+        # errors.append(repr(e))
+
+    # cogification
+    cmd = ['rio', 'cogeo', 'create', '-b', '1,2,3,4', dst_img, 
+           dst_cog]
+    p = run(cmd, capture_output=True)
+    msg = p.stderr.decode().split('\n')
+    progress_reporter(f'...{msg[-2]}', verbose, log, logger)
+
+    cmd = ['rio', 'cogeo', 'validate', dst_cog]
+    p = run(cmd, capture_output = True)
+    msg = p.stdout.decode().split('\n')
+    progress_reporter(f'...{msg[0]}', verbose, log, logger)
+
+    if os.path.exists(f"{dst_cog}"):
+        if os.path.exists(f"{dst_img}"):
+            os.remove(dst_img)

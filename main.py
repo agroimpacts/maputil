@@ -49,9 +49,8 @@ def main(config_path):
         log = True
         if not os.path.isdir(log_dir):
             os.mkdir(log_dir)
-        logger = setup_logger(log_dir, log_name, use_date)
+        logger = logging.getLogger("maputils")
     else: 
-        logger = None
         log = False
 
     if config['doGetGrid']:
@@ -136,5 +135,6 @@ def main(config_path):
         )
         progress_reporter(f"errors: {errors}", verbose, log, logger)
 
+setup_logger(log_dir, log_name, True)       
 if __name__ =='__main__':
     main('config/config.yml')
