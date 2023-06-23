@@ -19,3 +19,8 @@ nbands: 4
 dst_crs: 'EPSG:4326'
 quad_name: "<quad_dir>/<qname>.tif"
 tile_name: "<tile_dir>/tile<tile_id>_<date>_buf179.tif"
+num_cores: 1
+verbose: True
+create_log: False
+log_name: log_file
+use_date: False
