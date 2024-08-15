@@ -114,7 +114,7 @@ class PlanetDownloader():
     def download_tiles(
             self, PLANET_API_KEY, quad_dir, quad_name, quads_gdf=None, 
             catalog_path=None, download_url=None, list_quad_URL=None,  
-            dates=None, bbox=None
+            dates=None, bbox=None, verbose=False, log=False
         ):
         """
         Download basemaps from PlanetScope to local server
@@ -142,6 +142,11 @@ class PlanetDownloader():
         bbox: list
             Coordinates of the area to be queried
             Should be in format [xmin, ymin, xmax, ymax]
+        verbose : bool
+            Print messages to console or not
+        log : boolstr
+            Whether to log or not
+
         
         Returns
         -------
@@ -169,14 +174,15 @@ class PlanetDownloader():
                 quads, mosaic_name, _ = list_quads(PLANET_API_KEY, 
                                                    list_quad_URL, date, bbox)
                 for idx, i in enumerate(quads['items']):
-                    print(idx)
+                    # print(idx)
                     if quads_gdf is not None:
                         if i['id'] not in list(quads_gdf['tile']):
                             continue
                     link = i['_links']['download']
                     filename = get_quad_path(quad_name, quad_dir, mosaic_name)#, 
                                              #i['id'])
-                    download_tiles_helper(link, filename, log=False)
+                    download_tiles_helper(link, filename, verbose=verbose, 
+                                          log=log)
                 return
             # function to enable parallel processing
             
