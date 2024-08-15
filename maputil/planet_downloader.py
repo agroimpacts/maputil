@@ -176,7 +176,7 @@ class PlanetDownloader():
                     link = i['_links']['download']
                     filename = get_quad_path(quad_name, quad_dir, mosaic_name)#, 
                                              #i['id'])
-                    download_tiles_helper(link, filename)
+                    download_tiles_helper(link, filename, log=False)
                 return
             # function to enable parallel processing
             
@@ -351,7 +351,7 @@ def get_quad_path(quad_name_pt, quad_dir, qname):
     return filename
 
 
-def download_tiles_helper(url, filename):
+def download_tiles_helper(url, filename, log, verbose):
     """
     A helper function to download file to local server
     
@@ -361,15 +361,27 @@ def download_tiles_helper(url, filename):
         The url to download file
     filename: str
         File path to where the file will be downloaded to    
+    verbose : bool
+        Print messages to console or not
+    log : bool
+        Write messages to logger or not
     
     Returns
     -------
     """
+    if log:
+        logger = logging.getLogger("maputils")
+    else:
+        logger = None
+
     if not os.path.isfile(filename):
         urllib.request.urlretrieve(url, filename)
-        print(f"Downloaded: {filename}")
+        # print(f"Downloaded: {filename}")
+        progress_reporter(f"Downloaded: {filename}", verbose, log, logger)
     else:
-        print(f"File already exists: {filename}")
+        progress_reporter(f"File already exists: {filename}", verbose, log, 
+                          logger)
+        # print(f"File already exists: {filename}")
 
 
 def list_quads(PLANET_API_KEY, API_URL, date, bbox=None, _page_size=250):
